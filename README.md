@@ -1,4 +1,4 @@
-# AECLogger
+<p align="center"><img src="https://cloud.githubusercontent.com/assets/11571481/7535297/d3c50d2c-f583-11e4-84b9-fdbbb6450ce1.png" width="200" align="middle"></p><hr>
 <p align="center">Control and log AEConversion photovoltaik microinverters with PLC/HS485 protocol per web-interface based on mini-linux boards like RapberryPI / Cubieboards / Odroids ...</p>
 
 <p align="center"><b>The program is in no way associated with AEConversion.<br>
