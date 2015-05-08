@@ -5,6 +5,6 @@ The program is in no way associated with AEConversion, programmlogic handling th
 
 These Microinverters are mainly sold in german-speaking areas so the Wiki-description is done in german.
 
-<img src="https://cloud.githubusercontent.com/assets/11571481/7519738/5f177efc-f4e2-11e4-99d4-34f4cf9cb539.jpg" width="700" vertial-align:center;">
+<img src="https://cloud.githubusercontent.com/assets/11571481/7519738/5f177efc-f4e2-11e4-99d4-34f4cf9cb539.jpg" width="700" align="middle">
 
 
