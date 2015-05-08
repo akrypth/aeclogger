@@ -5,7 +5,7 @@
 <br>There is absolutely no support from AEConversion regarding AECLogger.<br>Use at your own risk !<br></b><br>
 The program-logic regarding the RS485 communication-protocol is based on re-engineering the Java-Application (AESolar) from AEConversion.<p align="center">
 
-<p align="center">These Microinverters are mainly sold in german-speaking areas, so the Wiki-description is written in german.</p>
+<p align="center">The Wiki-description is written in german.</p>
 
 <p align="center"><img src="https://cloud.githubusercontent.com/assets/11571481/7519738/5f177efc-f4e2-11e4-99d4-34f4cf9cb539.jpg" width="700" align="middle"></p>
 
