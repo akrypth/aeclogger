@@ -8,5 +8,7 @@ The program-logic regarding the RS485 communication-protocol is based on re-engi
 
 <p align="center"><img src="https://cloud.githubusercontent.com/assets/11571481/7519738/5f177efc-f4e2-11e4-99d4-34f4cf9cb539.jpg" width="700" align="middle"></p>
 
+<p align="center"><b >For further information see the AECLogger-Wiki</b></p>
+
 
 
