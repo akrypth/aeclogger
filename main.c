@@ -2418,11 +2418,7 @@ void processevent(int fd)
            submit_file(fd,"canvasjs.min.js.gz",1,NULL);
           }                      
 
-
- 
-        if ((pos = strstr(_cmd,"AJAX")) != NULL) { 
-           submit_file(fd,"ajax-loader.gif",1,NULL);
-          }
+      
         if ((pos = strstr(_cmd,"FRAG_BETRIEB")) != NULL) { 
         	 if (strlen(_dev) > 0) {
               int dev = atoi(_dev);
