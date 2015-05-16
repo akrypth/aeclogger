@@ -1,4 +1,4 @@
-##1 
+﻿##1 
 | Reserviert für Konfigurationseinträge Keyword=Eintrag  
 
 | Allgemeine Programmparameter
