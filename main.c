@@ -43,7 +43,7 @@
 #define F_PARAM 6
 #define F_STATISTIK 7
 
-const char Version[] = "0.13";
+const char Version[] = "0.14";
 const double sqr2 = 1.414213562373095;
 
 
@@ -2449,7 +2449,7 @@ void processevent(int fd)
           }
         
         if ((pos = strstr(_cmd,"LOGO")) != NULL) { 
-           submit_file(fd,"logo.png",1,NULL);
+           submit_file(fd,"logo.gif",1,NULL);
           }
 
         if ((pos = strstr(_cmd,"CANVASJS")) != NULL) { 
