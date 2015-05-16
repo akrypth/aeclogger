@@ -308,15 +308,13 @@ function setvaluefield(pos, val) {
 // ***************************************************************   
 
 	function reload_daten(_target, _key){
-		var rq;
-	   rq = new XMLHttpRequest();
+	   var rq = new XMLHttpRequest();
 	   rq.onreadystatechange=function()
        {
        	if (rq.readyState==4 && rq.status==200)
            document.getElementById(_target).innerHTML=rq.responseText;
        }
-       xrequest ="http://"+hosttxt+"/?CMD=FRAG_"+_key+"&DEV="+deviceindex;
-       rq.open("GET", xrequest, true);
+       rq.open("GET", "http://"+hosttxt+"/?CMD=FRAG_"+_key+"&DEV="+deviceindex, true);
 	     rq.send(null);
 	}
 
@@ -325,7 +323,7 @@ function setvaluefield(pos, val) {
 	
   function set_reduction (){
   	 var Combo = document.getElementById ( 'combo_reduce' );
-  	 rq = new XMLHttpRequest();
+  	 var rq = new XMLHttpRequest();
   	 rq.onreadystatechange=function()
        {
        	if (rq.readyState==4 && rq.status==200)
@@ -337,8 +335,7 @@ function setvaluefield(pos, val) {
            	 document.getElementById('id_reduce').style.color = "#BB0000";           
           }
        }
-     xrequest ="http://"+hosttxt+"/?CMD=REDUCE&DEV="+deviceindex+"&VAL="+Combo.options[Combo.selectedIndex].value;
-     rq.open("GET", xrequest, true);
+     rq.open("GET", "http://"+hosttxt+"/?CMD=REDUCE&DEV="+deviceindex+"&VAL="+Combo.options[Combo.selectedIndex].value, true);
 	   rq.send(null);
   }
   
@@ -348,20 +345,18 @@ function setvaluefield(pos, val) {
 
   function refresh_current() 
    {
-	   var rq;
-	   rq = new XMLHttpRequest();
+	   var rq = new XMLHttpRequest();
 	   rq.onreadystatechange=function()
        {
        	if (rq.readyState==4 && rq.status==200)
          {
-         	jdata = JSON.parse(rq.responseText);
+         	var jdata = JSON.parse(rq.responseText);
           parent.document.getElementById('id_current_ts').innerHTML=jdata.data[0].t;
           document.getElementById('id_c_current_p').innerHTML=jdata.data[0].p+" / "+Math.round(jdata.data[0].v*1000);
           document.getElementById('id_c_current_s').innerHTML=jdata.data[0].s;
          }
        }
-       xrequest ="http://"+hosttxt+"/?CMD=CURRENT&DEV="+deviceindex;
-       rq.open("GET", xrequest, true);
+       rq.open("GET", "http://"+hosttxt+"/?CMD=CURRENT&DEV="+deviceindex, true);
 	     rq.send(null);
    }
    
@@ -371,36 +366,41 @@ function setvaluefield(pos, val) {
 
    function refresh_status() 
    {
-	   var rq;
-	   rq = new XMLHttpRequest();
+	   var rq = new XMLHttpRequest();
 	   rq.onreadystatechange=function()
        {
        	if (rq.readyState==4 && rq.status==200)
          {
-         	jdata = JSON.parse(rq.responseText);
+         	var jdata = JSON.parse(rq.responseText);
           if (jdata.data[0].offline == 1) {
-          	   document.getElementById('id_statusinfo').innerHTML = 'OFFLINE';
-          	   document.getElementById('id_statusinfo').style.color="#DD0000";
+			          document.getElementById('id_status_icon_1').style.display="none";
+			          document.getElementById('id_status_icon_2').style.display="none";
+			          document.getElementById('id_status_icon_3').style.display="none";
+			          document.getElementById('id_status_offline').style.display="block";
               }
-          var e = document.getElementById('id_status_icon_1').style;    
-          if (jdata.data[0].betrieb == 1) 
-             document.getElementById('id_status_icon_1').style.backgroundColor="#77cc77";
-          else            
-             document.getElementById('id_status_icon_1').style.backgroundColor="#cc7777";
-                      
-          if (jdata.data[0].fehler == 1) 
-             document.getElementById('id_status_icon_2').style.backgroundColor="#77cc77";
-          else            
-             document.getElementById('id_status_icon_2').style.backgroundColor="#cc7777";
-                      
-          if (jdata.data[0].stoer == 1) 
-             document.getElementById('id_status_icon_3').style.backgroundColor="#77cc77";
-          else            
-             document.getElementById('id_status_icon_3').style.backgroundColor="#cc7777";
+          else {    
+			          document.getElementById('id_status_icon_1').style.display="block";
+			          document.getElementById('id_status_icon_2').style.display="block";
+			          document.getElementById('id_status_icon_3').style.display="block";
+			          document.getElementById('id_status_offline').style.display="none";
+			          if (jdata.data[0].betrieb == 1) 
+			             document.getElementById('id_status_icon_1').style.backgroundColor="#77cc77";
+			          else            
+			             document.getElementById('id_status_icon_1').style.backgroundColor="#cc7777";
+			                      
+			          if (jdata.data[0].fehler == 1) 
+			             document.getElementById('id_status_icon_2').style.backgroundColor="#77cc77";
+			          else            
+			             document.getElementById('id_status_icon_2').style.backgroundColor="#cc7777";
+			                      
+			          if (jdata.data[0].stoer == 1) 
+			             document.getElementById('id_status_icon_3').style.backgroundColor="#77cc77";
+			          else            
+			             document.getElementById('id_status_icon_3').style.backgroundColor="#E7E101";
+           }
          }
        }
-       xrequest ="http://"+hosttxt+"/?CMD=SMALL_STATUS&DEV="+deviceindex;
-       rq.open("GET", xrequest, true);
+       rq.open("GET", "http://"+hosttxt+"/?CMD=SMALL_STATUS&DEV="+deviceindex, true);
 	     rq.send(null);
    }
 
@@ -410,6 +410,7 @@ function setvaluefield(pos, val) {
    function refresh_data()
    {
    	reload_daten("table_betriebsdaten","BETRIEB");	
+   	
    	refresh_current();
     //updateComboReduce(); 
 
@@ -424,18 +425,13 @@ function setvaluefield(pos, val) {
    
    function getLivePowerChartData() 
    {
-	   var rq;
-	   var doshift = 0;
-	   var jdata;
-	   rq = new XMLHttpRequest();
+	   var rq = new XMLHttpRequest();
 	   rq.onreadystatechange=function()
        {
 	       if (rq.readyState==4 && rq.status==200) {
-	        	jdata = JSON.parse(rq.responseText);
-	        	if (chartLivePower.options.data[0].dataPoints.length > 50)
-	        	  doshift = 1;
+	        	var jdata = JSON.parse(rq.responseText);
 	        	for (a=0; a<jdata.datapoints.length; a++) {
-	        		if (doshift == 1)
+	        		if (chartLivePower.options.data[0].dataPoints.length > 50)
 	        		   chartLivePower.options.data[0].dataPoints.shift();
 	            chartLivePower.options.data[0].dataPoints.push({x:jdata.datapoints[a].x*1000,y:jdata.datapoints[a].y});
 		          lasttsLivePower = jdata.datapoints[a].x; 
@@ -444,8 +440,7 @@ function setvaluefield(pos, val) {
 	        	setTimeout("getLivePowerChartData();",5000);
 	       }
        }
-       xrequest ="http://"+hosttxt+"/?CMD=DATALIVEDATA&DEV="+deviceindex+"&TS="+lasttsLivePower;
-       rq.open("GET", xrequest, true);
+       rq.open("GET", "http://"+hosttxt+"/?CMD=DATALIVEDATA&DEV="+deviceindex+"&TS="+lasttsLivePower, true);
 	     rq.send(null);
    }
 
@@ -454,19 +449,16 @@ function setvaluefield(pos, val) {
 
  function getHourChartData() 
    {
-	   var rq;
-	   rq = new XMLHttpRequest();
+	   var rq = new XMLHttpRequest();
 	   rq.onreadystatechange=function()
        {
        	if (rq.readyState==4 && rq.status==200)
          {
-        	jdata = JSON.parse(rq.responseText);
+        	var jdata = JSON.parse(rq.responseText);
           var a,b;
           for (a=0; a<jdata.devices.length+2; a++) 
         		 chartDayHour.options.data[a].dataPoints=[];
-        	
         	for (a=0; a<jdata.devices.length; a++) {
-        		 
              for (b=0; b<jdata.devices[a].data.length; b++) { 
              	   if (jdata.devices[a].data[b].val>0) {
             	       chartDayHour.options.data[a].dataPoints.push({x:(jdata.devices[a].data[b].ts-3600)*1000,y:jdata.devices[a].data[b-1].val});
@@ -482,21 +474,15 @@ function setvaluefield(pos, val) {
             	for (a=0; a<jdata.devices.length; a++) {
             		sum += jdata.devices[a].data[b].val;
             		if (sum > smax) smax = sum;
-            		
             	}
-            	if (sum >jdata.devices.length) {
+            	if (sum >jdata.devices.length) 
             	  chartDayHour.options.data[jdata.devices.length+1].dataPoints.push({x:(jdata.devices[0].data[b].ts-1800)*1000,y:sum, indexLabel:sum.toFixed(0)});
-            	  
-            	  }
             }
-          //chartDayHour.options.axisY2.maximum= smax*1.2; 
         	chartDayHour.render();
-
         	setTimeout("getHourChartData();",5000);
          }
        }
-       xrequest ="http://"+hosttxt+"/?CMD=GETHOURDATA&DEV="+devicefield;
-       rq.open("GET", xrequest, true);
+       rq.open("GET", "http://"+hosttxt+"/?CMD=GETHOURDATA&DEV="+devicefield, true);
        rq.send(null);
      }
 
@@ -508,8 +494,6 @@ function setvaluefield(pos, val) {
    
   function getDayLogChartData( redo, clearts )  {
    	 clearTimeout(Timeout_LogChartData);
-   	 
-	   var rq;
 	   var Combo = document.getElementById ( 'combo_chart' );
 	   var ctyp = Combo.options[Combo.selectedIndex].value;
 	   clearvaluefield();
@@ -566,7 +550,7 @@ function setvaluefield(pos, val) {
 	   	            break;
 
 	     }
-	   rq = new XMLHttpRequest();
+	   var rq = new XMLHttpRequest();
 	   rq.onreadystatechange=function() {
        	if (rq.readyState==4 && rq.status==200)
          {
@@ -615,12 +599,15 @@ function setvaluefield(pos, val) {
 	      lasttsDayLog = 0;
         document.getElementById("combo_chart").blur();
 	      }
-       
-       xrequest ="http://"+hosttxt+"/?CMD=GETLOGDATA&DEV="+devicefield+"&TS="+lasttsDayLog+"&VAL="+valuefield;
-
-       rq.open("GET", xrequest, true);
-       rq.send(null);
+     rq.open("GET", "http://"+hosttxt+"/?CMD=GETLOGDATA&DEV="+devicefield+"&TS="+lasttsDayLog+"&VAL="+valuefield, true);
+     rq.send(null);
      }
+
+  function getTimeString ( seconds ){
+    return (new Date(seconds)).toLocaleTimeString(); 
+  }
+
+ 
 
 //               CANVAS.JS Charts initialisieren
 // ***************************************************************     
@@ -705,6 +692,12 @@ function createCharts() {
 				    	animationEnabled: false,
 				    	backgroundColor:"transparent",
 				    	margin: 10,
+				    	toolTip:{             
+        content: function(e){
+          var content;
+          content = getTimeString(e.entries[0].dataPoint.x) + "<br><strong>"+e.entries[0].dataPoint.y +" W" ;
+          return content;
+        }},
 
 					    axisX:{
 					    	     margin:0, gridThickness: 1,
@@ -936,9 +929,10 @@ function createCharts() {
 	
 	<div style='position:absolute; top:8px; left:390px;'>
 		<a class ='menupopup' style='width:110px; hight:25px;text-align:left;' id='id_statusinfo'  onclick='show_info(1);'>Status
-      <div id='id_status_icon_1' style='position:absolute; top:5px; left:55px; width:20px; height:20px; background-color:#aaaaaa; border-radius:3px;'></div>
-      <div id='id_status_icon_2' style='position:absolute; top:5px; left:76px; width:20px; height:20px; background-color:#aaaaaa; border-radius:3px;'></div>
-      <div id='id_status_icon_3' style='position:absolute; top:5px; left:97px; width:20px; height:20px; background-color:#aaaaaa; border-radius:3px;'></div>
+			<div id='id_status_offline' style='display:none;position:absolute; top:5px; left:55px; width:50px; height:20px; '>offline</div>
+      <div id='id_status_icon_1' style='display:block;position:absolute; top:5px; left:55px; width:20px; height:20px; background-color:#aaaaaa; border-radius:3px;'></div>
+      <div id='id_status_icon_2' style='display:block;position:absolute; top:5px; left:76px; width:20px; height:20px; background-color:#aaaaaa; border-radius:3px;'></div>
+      <div id='id_status_icon_3' style='display:block;position:absolute; top:5px; left:97px; width:20px; height:20px; background-color:#aaaaaa; border-radius:3px;'></div>
     </a>
 	</div>	
 
@@ -1051,21 +1045,18 @@ function createCharts() {
   var devicedata=window.parent.devicedata;
 	
 	function reload_daten(_target, _key){
-		var rq;
-	   rq = new XMLHttpRequest();
+	   var rq = new XMLHttpRequest();
 	   rq.onreadystatechange=function()
        {
        	if (rq.readyState==4 && rq.status==200)
            document.getElementById(_target).innerHTML=rq.responseText;
        }
-       xrequest ="http://"+hosttxt+"/?CMD=FRAG_"+_key;
-       rq.open("GET", xrequest, true);
+       rq.open("GET", "http://"+hosttxt+"/?CMD=FRAG_"+_key, true);
 	     rq.send(null);
 	}
 
   function refresh_current_overview() {  // Barchart
-	   var rq;
-	   rq = new XMLHttpRequest();
+	   var rq = new XMLHttpRequest();
 	   rq.onreadystatechange=function()
        {
        	if (rq.readyState==4 && rq.status==200)
@@ -1288,13 +1279,12 @@ chartStatusBar = new window.parent.CanvasJS.Chart(document.getElementById("chart
 
  function getDayHourChartData() 
    {
-	   var rq;
-	   rq = new XMLHttpRequest();
+	   var rq = new XMLHttpRequest();
 	   rq.onreadystatechange=function()
        {
        	if (rq.readyState==4 && rq.status==200)
          {
-        	jdata = JSON.parse(rq.responseText);
+        	var jdata = JSON.parse(rq.responseText);
           var a,b;
           for (a=0; a<jdata.devices.length+2; a++) 
         		 chartDayHourSum.options.data[a].dataPoints=[]; 
@@ -1322,8 +1312,7 @@ chartStatusBar = new window.parent.CanvasJS.Chart(document.getElementById("chart
         	setTimeout("getDayHourChartData();",5000);
          }
        }
-       xrequest ="http://"+hosttxt+"/?CMD=GETHOURDATA&DEV="+devicefield;
-       rq.open("GET", xrequest, true);
+       rq.open("GET", "http://"+hosttxt+"/?CMD=GETHOURDATA&DEV="+devicefield, true);
        rq.send(null);
      }
 

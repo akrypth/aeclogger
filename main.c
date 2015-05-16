@@ -43,7 +43,7 @@
 #define F_PARAM 6
 #define F_STATISTIK 7
 
-const char Version[] = "0.12";
+const char Version[] = "0.13";
 const double sqr2 = 1.414213562373095;
 
 
@@ -82,6 +82,8 @@ time_t startuptime;
 int logit = 4;
 
 int globalgetsize;
+
+char stimebuffer[30];
 
 char gzfname[50];
 
@@ -122,6 +124,8 @@ long logtime;
 		void saveDayLog (int, int);
 		void saveLiveLog (int , int);
 		void init_fdarrays();
+		
+		void printQueue (void); 
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 
@@ -314,7 +318,7 @@ fd_set active_fd_set, read_fd_set;
 		 };
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
-// HS485-Queue
+// RS485-Queue
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 		struct s_queue {
 			
@@ -328,9 +332,30 @@ fd_set active_fd_set, read_fd_set;
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
 
+
+char * getTimeString(void)
+{
+	struct tm * timeinfo;
+  long ts = time(NULL);	
+	timeinfo = localtime(&ts);
+	strftime (stimebuffer,49,"%d.%B.%Y %H:%M:%S",timeinfo);
+	return stimebuffer;
+}
+
 /************************************************\
-    HS485 queue handling
+    RS485-queries  queue handling
 \************************************************/
+
+void printQueue (void) 
+{
+	int a;
+	printf("Queuesize:%d %d\r\n",queuesize,queueentries);
+	for (a=0; a<queuesize; a++){
+	  printf("\t%d = %d [%d]\r\n",a,queue[a].deviceindex,queue[a].type);
+	}
+	fflush(stdout);
+}
+
 
 void createQueue (void)
 {
@@ -363,6 +388,7 @@ void pullQueueEntry (void)
 	}
 	queueentries--;
 	queue[queuesize-1].deviceindex=-1;
+	queue[queuesize-1].type=0;
 }
 
 void CompactQueue (void)
@@ -380,6 +406,7 @@ void CompactQueue (void)
 	  	 if (found) {
 	  	 	  memcpy (queue+a, queue+b, sizeof(struct s_queue));
 	  	 	  queue[b].deviceindex = -1;
+	  	 	  queue[b].type=0;
 	  	   }
 	  	 else 
 	  	 	 break;	
@@ -391,11 +418,22 @@ void DeleteDeviceEntriesFromQueue (int deviceindex)
 {
 	int a;
 	for (a=0; a<queuesize; a++) {
-		if (queue[a].deviceindex == deviceindex)
+		if (queue[a].deviceindex == deviceindex) {
 		    queue[a].deviceindex=-1;
+		    queue[a].type=0;
 		    queueentries--;
+		  }
 	}
+	printQueue();
 	CompactQueue();
+}
+
+void testQueue(void)
+{
+	printf("START\r\n");
+	printQueue();
+	DeleteDeviceEntriesFromQueue(1);
+	printQueue();
 }
 
 /************************************************\
@@ -774,7 +812,7 @@ void initDayLogs (void)
 
 void saveLiveLog (int idx, int tmp)
 {
-	if (logit & 4) printf("saveLiveLog"); fflush(stdout);   
+	//if (logit & 4) printf("saveLiveLog"); fflush(stdout);   
 	
 	char fname[100];
   
@@ -789,7 +827,7 @@ void saveLiveLog (int idx, int tmp)
 	  }
 	else 
 		printf("cannot open LOG-File %s\r\n",fname);
-	if (logit & 4) printf("...DONE\r\n"); fflush(stdout);   
+	//if (logit & 4) printf("...DONE\r\n"); fflush(stdout);   
 }
 
 //************************************************
@@ -825,7 +863,7 @@ void cleanTmp (void)
 
 void saveDayLog (int idx, int tmp)
 {
-	if (logit & 4) printf("saveDayLog"); fflush(stdout);   
+	//if (logit & 4) printf("saveDayLog"); fflush(stdout);   
 
 	struct tm * timeinfo;
 	char fname[100];
@@ -849,7 +887,7 @@ void saveDayLog (int idx, int tmp)
 	  }
 	else 
 		printf("cannot open LOG-File %s\r\n",fname);
-	if (logit & 4) printf("...DONE\r\n"); fflush(stdout);   
+	//if (logit & 4) printf("...DONE\r\n"); fflush(stdout);   
 }
 
 
@@ -920,17 +958,17 @@ void loadDayLog (int idx, int tmp)
 
 //************************************************
 
-void pushLiveLog ()
+void pushLiveLog (int idx)
 {
-	int a,idx; 
+	int a; 
 	
-	for (idx=0; idx<AENumDevices; idx++) {
+//	for (idx=0; idx<AENumDevices; idx++) {
 			if (AELiveLogPos[idx] == AELiveLogSize[idx]-1) { 
 				for (a=0; a<AELiveLogSize[idx]-1; a++)
 				 AELiveLog[idx][a] =  AELiveLog[idx][a+1];
 			  }
 			
-			AELiveLog[idx][AELiveLogPos[idx]].ts = logtime;
+			AELiveLog[idx][AELiveLogPos[idx]].ts = AEData[idx].AE_TS_Current;
 			AELiveLog[idx][AELiveLogPos[idx]].reduce = (float) AEData[idx].AE_Reduzierung;
 			AELiveLog[idx][AELiveLogPos[idx]].power = (float) AEData[idx].AE_current_power;
 			AELiveLog[idx][AELiveLogPos[idx]].value = (float) AEData[idx].AE_PV_DC_Spannung;
@@ -948,7 +986,7 @@ void pushLiveLog ()
 		  	saveLiveLog(idx,1);
 		  	AELiveLogCounter[idx]=0;
 		  }
-  }
+ // }
 }
 
 //************************************************
@@ -1008,7 +1046,6 @@ void changeLogDay(void)
        }
       cleanTmp();	  
       resetLogs();  
-      
     }
 }
 
@@ -1095,11 +1132,10 @@ int submit_file (int fd, char * file, int where, char* uploadfilename) //1->prog
               
               }
            if (uploadfilename != NULL) write_st(fd,"Content-Disposition: attachment; filename=\"%s\"\r\n",uploadfilename); 
-           
               
             if (strstr(file,".gz")!=NULL){
             	  write_st(fd,"Cache-Control: no-cache\r\n");  
-            	  if (logit & 4) printf("GZS(%ld)",fstatus.st_size);fflush(stdout);
+            	  //if (logit & 4) printf("GZS(%ld)",fstatus.st_size);fflush(stdout);
             	  write_st(fd,"Content-Encoding: gzip\r\n");
                }
 
@@ -1205,7 +1241,7 @@ void buildTextIndex (void)
 
 char * getText (int idx)
 {
- if (logit & 4) printf("G(%d)",idx),fflush(stdout);
+ //if (logit & 4) printf("G(%d)",idx),fflush(stdout);
  FILE * f;
  char * buf = NULL; 
  int ctr;
@@ -1255,7 +1291,7 @@ char * getText (int idx)
 
  fclose(f);
  free (line);
- if (logit & 4) printf("D(%d)",idx);fflush(stdout);
+ //if (logit & 4) printf("D(%d)",idx);fflush(stdout);
  return buf; 
 }  
 
@@ -1426,17 +1462,14 @@ void getParameters(void)
 	AEDevicesComment =calloc(ct,sizeof(char *));
 	AENumDevices=ct;
 	AEData = calloc(AENumDevices * sizeof(struct sAEData),1);
-	int i;
-	for (i=0; i<AENumDevices; i++) {
-		  AEData[i].AE_Offline = 1;
-	   }
-	
+
+	for (a=0; a<AENumDevices; a++) 
+		  AEData[a].AE_Offline = 1;
 	
 	for (a=0; a<ct; a++){
 		snprintf(key,29,"inverterid_%d=",a);
-		if (start=strstr(params,key)) {
+		if (start=strstr(params,key)) 
 			AEDevices[a]=atoi(start+strlen(key));
-		}
 	}
 	
 	for (a=0; a<ct; a++){
@@ -1521,7 +1554,7 @@ void write_offlinepage (int fd, int idx)
 
 int get_offlinestate (int idx)
 {
-		int a;
+	int a;
 	if (idx < 0)
 	  for (a=0; a<AENumDevices; a++) {
 		  if (! AEData[a].AE_Offline) 
@@ -1529,6 +1562,7 @@ int get_offlinestate (int idx)
 	   }
 	if (idx >=0)
 		  return  AEData[idx].AE_Offline ; 
+	
 	return 1;
 }
 //************************************************ 
@@ -1861,7 +1895,7 @@ void write_json_LiveChart(int fd, int idx, long ts)
 	int r = 0;
 	write_st(fd,"{\"datapoints\":[");
 	for (a=0; a<AELiveLogPos[idx]; a++) {
-		 if (AELiveLog[idx][a].ts > ts && AELiveLog[idx][a].power >=0 ) {
+		 if (AELiveLog[idx][a].ts > ts && AELiveLog[idx][a].power > 0 ) {
 		   write_st(fd,"{\"x\":%ld,\"y\":%1.2f,\"v\":%1.3f}%s",AELiveLog[idx][a].ts,AELiveLog[idx][a].power,AELiveLog[idx][a].value,a==AELiveLogPos[idx]-1 ? "" : ",");
 		  }
 	  }
@@ -2316,7 +2350,7 @@ void processevent(int fd)
           free(txt); 
    	     	return;
    	    }  
-        if (logit & 4) printf("-->%s\r\n",url);			
+        //if (logit & 4) printf("req-->%s\r\n",url);			
 		    if ((pos = strstr(url,"CMD=")) != NULL) 
   	       getValue(pos+4, _cmd, '&',20);
   	    if ((pos = strstr(url,"VAL=")) != NULL) 
@@ -2338,17 +2372,21 @@ void processevent(int fd)
 	         write_st(fd,"AECLOGGEROK");          
           }
 
+        if ((pos = strstr(_cmd,"QLIST")) != NULL) { 
+           printQueue();        
+          }
+        if ((pos = strstr(_cmd,"QTEST")) != NULL) { 
+           testQueue();        
+          }
         if ((pos = strstr(_cmd,"GETEXPORTFILE")) != NULL) { 
            writeCSVArchiveLogData(fd, _dev, atol(_ts));
            }
-
 
         if ((pos = strstr(_cmd,"OVERTAKE")) != NULL) { 
            send_http_header (fd,200);
 	         write_st(fd,"OVERTAKEOK");          
 	         ShutDown();
           }
-
 
         if ((pos = strstr(_cmd,"PVC")) != NULL) { 
               	 if (strlen(_val) > 0) {
@@ -2418,7 +2456,6 @@ void processevent(int fd)
            submit_file(fd,"canvasjs.min.js.gz",1,NULL);
           }                      
 
-      
         if ((pos = strstr(_cmd,"FRAG_BETRIEB")) != NULL) { 
         	 if (strlen(_dev) > 0) {
               int dev = atoi(_dev);
@@ -2475,8 +2512,6 @@ void processevent(int fd)
               write_json_Status(fd,dev);
             }
           }  
-
-
 
 
         if ((pos = strstr(_cmd,"DATALIVEDATA")) != NULL) { 
@@ -2781,6 +2816,7 @@ void AE_Get_Ertragsdaten (char *buffer, int len)
 	if (tmpyield > AEData[AEDeviceIndex].AE_today_yield) 
 		AEData[AEDeviceIndex].AE_today_yield = tmpyield;   // Summe heutige Leistung
 	AEData[AEDeviceIndex].AE_TS_Current = time(NULL);	
+	pushLiveLog(AEDeviceIndex);
 }
 
 //**********************************************************************
@@ -3156,19 +3192,28 @@ int AE_Request (int idx, unsigned short type, int value)
    }
   SendSerial(req,ct);	
   r = ReadSerial();	
-
+  
+  
   if (r>0)  r = AE_Analyze (sbuf, r);
+  	
+  if (AEData[idx].AE_Offline == 1) 		
+      printf ("%s Offline RQ[%d] %d (%d)\r\n",getTimeString(),idx,type,r);fflush(stdout);
+
   		
   if (r==0) {  // Error - no Answer or wrong CS
+    printf ("%s Error RQ[%d] %d (%d)\r\n",getTimeString(),idx,type,r);fflush(stdout);
+
   	// Wenn das erste mal offline ...
      if (AEData[idx].AE_Offline == 0) {
 		  	   AEData[idx].AE_Offline_ts = time(NULL);
 		 	     saveLiveLog (idx, 1);
 		 	     saveDayLog (idx, 1);
+		 	     
 		       }
 		 else  
 		  	 AEData[idx].AE_Offline_ct++;
 		 AEData[idx].AE_Offline = 1;
+		 printf ("%s offline[%d] (%d)\r\n",getTimeString(),idx,AEData[idx].AE_Offline_ct);fflush(stdout);
      }
     else {  // Success
   	  AEData[idx].AE_Lastrequest_ts = time(NULL); 
@@ -3176,6 +3221,7 @@ int AE_Request (int idx, unsigned short type, int value)
 		  if (AEData[idx].AE_Offline) 
 		 	   if ((AEData[idx].AE_Lastrequest_ts > AEData[idx].AE_Offline_ts + 600) ||
 		 		      (AEData[idx].AE_Lastrequest_ts < AEData[idx].AE_Offline_ts + 60 && AEData[idx].AE_Offline_ct == 1)) {
+		 		      	  printf ("%s online[%d]\r\n",getTimeString(),idx);fflush(stdout);
 		     		  	  AEData[idx].AE_Offline = 0;
 				 		  	  AEData[idx].AE_Offline_ct = 0;
 				 		  	  AEData[idx].AE_Online_ts = time(NULL);
@@ -3446,18 +3492,8 @@ int main (int argc, char *argv[])
 
   while (1) {
 		  read_fd_set = active_fd_set;  // save the select-set
-		  if (queueentries != 0) {
-		     timeout.tv_usec = 10000; 
-	       }
-	    else {
-	       timeout.tv_usec = 500000; 
-	       }  
-	     
+		  timeout.tv_usec = queueentries != 0 ? 10000 : 500000;
 		  selectanswer = select (FD_SETSIZE, &read_fd_set, NULL, NULL, &timeout);	 
-		  
-		  if ( selectanswer < 0) {exit(0);}
-		
-		//***************************************************************************************
 		
 		  if ( selectanswer != 0 ) {
 				 for (fdc = 0; fdc < FD_SETSIZE; ++fdc)
@@ -3483,12 +3519,9 @@ int main (int argc, char *argv[])
            	      if (AEData[i].AE_Offline) off++;
                 }
              changeLogDay(); // check & set logdate
-             printf("LOG"),fflush(stdout);
              //if min. one inv active -> push logs        
-             if (off < AENumDevices) {
+             if (off < AENumDevices) 
            	      pushDayLog();
-	   	   	        pushLiveLog();
-           	     }
 		  	 }
 		  	
 		     if (queueentries != 0) {  // PULL REQUESTS
@@ -3508,7 +3541,9 @@ int main (int argc, char *argv[])
 		       	  	  logticker = 0;
 		       	  continue;
 		      }
-		    
+		     
+		      
+		      	
 		    
 		    	if (reqticker <= current_time) { // PUSH POWERREQUESTS
  		        int i;
@@ -3523,7 +3558,7 @@ int main (int argc, char *argv[])
 				          pushQueueEntry (i, SET_LEISTUNGSREDUZIERUNG, AEData[i].AE_Reduzierung_set);
 
 						    pushQueueEntry (i, GET_BETRIEBSDATEN, 0);
-						    pushQueueEntry (i, GET_LEISTUNGSREDUZIERUNG, 0);  
+						    pushQueueEntry (i, GET_LEISTUNGSREDUZIERUNG, 0); 
 			         }
 		        } 
 		      
@@ -3536,6 +3571,8 @@ int main (int argc, char *argv[])
 			        pushQueueEntry (i, GET_ERTRAGSDATEN, 0);
 		        } 
 		      } 
+		      
+		      
 		   }
   } // select loop
    
