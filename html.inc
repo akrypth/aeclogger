@@ -1,29 +1,4 @@
-﻿##1 
-| Reserviert für Konfigurationseinträge Keyword=Eintrag  
-
-| Allgemeine Programmparameter
-
-http_port=3038
-serial_port=/dev/ttyUSBx
-
-tmp_path=/tmp/
-log_path=/aelog/
-
-log_interval=10
-req_interval=10
-pow_interval=5
-
-| -> Daten für Inverter Nr 1
-
-inverterid_0=123
-invertercomment_0=HauptWR Hausdach
-inverterreduce_0=240
-
-| -> Daten für Inverter Nr 2
-
-inverterid_1=456
-|schuecoid_1=10
-invertercomment_1=TestWR Garagendach
+##1 
 
 ##10
 | 

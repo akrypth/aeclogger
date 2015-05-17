@@ -43,7 +43,7 @@
 #define F_PARAM 6
 #define F_STATISTIK 7
 
-const char Version[] = "0.14";
+const char Version[] = "0.15";
 const double sqr2 = 1.414213562373095;
 
 
@@ -76,6 +76,7 @@ int listenport=3038;
 char * serialport;
 char * program_path = NULL;
 char default_path[] = "./";
+char * param_path = NULL;
 char * tmp_path;
 char * log_path;
 time_t startuptime;	
@@ -424,7 +425,7 @@ void DeleteDeviceEntriesFromQueue (int deviceindex)
 		    queueentries--;
 		  }
 	}
-	printQueue();
+	//printQueue();
 	CompactQueue();
 }
 
@@ -1395,112 +1396,138 @@ void initSerialPort ()
 
 void getParameters(void)
 {
-	char * params =	getText(1); //erster Eintrag der HTML-Templates ist reserviert für Parameter :-)
-	char * start, * end;
- 	
-	if (start = strstr(params,"http_port="))
-		listenport = atoi (start+10);
-		
-	if (start = strstr(params,"log_interval="))
-		log_interval = atoi (start+13);	
-	if (start = strstr(params,"req_interval="))
-		req_interval = atoi (start+13);	
-	if (start = strstr(params,"pow_interval="))
-		pow_interval = atoi (start+13);	
+	char * params;
+	char pname[250];
+	snprintf(pname,249,"%saeclogger.ini",param_path);
 	
 	
-	end = NULL;	
-	if (start = strstr(params,"serial_port=")) {
-		start+=12;
-	  if (! (end = strstr(start,";"))) 
-	  	if ( !(end = strstr(start,"\r\n")))
-	  		if ( !(end = strstr(start,"\n")))
-	  			end = strstr(start,"\r");
-		if (end) {
-			serialport=calloc(end-start+1,1);
-			memcpy(serialport, start,end-start);
-	    printf("%s\r\n",serialport);
-			}
-	}	
+	struct  stat fstatus; 
+  
+  if (stat(pname, &fstatus) == 0) {
+    params=malloc(fstatus.st_size+1) ;
+    }
+  else {
+  	printf("Datei %s nicht gefunden !\r\n",pname);
+  	exit(0);
+    }  
 	
-	end = NULL;	
-	if (start = strstr(params,"tmp_path=")) {
-		start+=9;
-	 if (! (end = strstr(start,";"))) 
-	  	if ( !(end = strstr(start,"\r\n")))
-	  		if ( !(end = strstr(start,"\n")))
-	  			end = strstr(start,"\r");
-		if (end) {
-			tmp_path=calloc(end-start+1,1);
-			memcpy(tmp_path, start,end-start);
-			}
-	}	
 	
-	end = NULL;	
-	if (start = strstr(params,"log_path=")) {
-		start+=9;
-	  if (! (end = strstr(start,";"))) 
-	  	if ( !(end = strstr(start,"\r\n")))
-	  		if ( !(end = strstr(start,"\n")))
-	  			end = strstr(start,"\r");
-		if (end) {
-			log_path=calloc(end-start+1,1);
-			memcpy(log_path, start,end-start);
-			}
-	}	
-	int a;
-	int ct = 0;
-	char key[30];
-	start=params;
-	while (start = strstr(start,"inverterid_")) {
-	   ct++;
-	   start++;
-	 }
-
-	AEDevices =calloc(ct,sizeof(int));
-	SchuecoID =calloc(ct,sizeof(int));
-	AEDevicesComment =calloc(ct,sizeof(char *));
-	AENumDevices=ct;
-	AEData = calloc(AENumDevices * sizeof(struct sAEData),1);
-
-	for (a=0; a<AENumDevices; a++) 
-		  AEData[a].AE_Offline = 1;
-	
-	for (a=0; a<ct; a++){
-		snprintf(key,29,"inverterid_%d=",a);
-		if (start=strstr(params,key)) 
-			AEDevices[a]=atoi(start+strlen(key));
-	}
-	
-	for (a=0; a<ct; a++){
-		snprintf(key,29,"inverterreduce_%d=",a);
-		if (start=strstr(params,key)) {
-			printf("---%s----\r\n",start+strlen(key));fflush(stdout);
-			AEData[a].AE_Reduzierung_set=(double)atoi(start+strlen(key));
-		}
-	}
-	
-		for (a=0; a<ct; a++){
-		snprintf(key,29,"schuecoid_%d=",a);
-		if (start=strstr(params,key)) {
-			SchuecoID[a]=atoi(start+strlen(key));
-		}
-	}
-
-	for (a=0; a<ct; a++){
-		snprintf(key,29,"invertercomment_%d=",a);
-		if (start=strstr(params,key)) {
-			if (! (end = strstr(start,";"))) 
-	  	if ( !(end = strstr(start,"\r\n")))
-	  		if ( !(end = strstr(start,"\n")))
-	  			end = strstr(start,"\r");
-		  if (end) {
-			AEDevicesComment[a]=calloc(end-start+1,1);
-			memcpy(AEDevicesComment[a], start+strlen(key),end-start-strlen(key));
-		 } 
-		}
-	}
-	free (params);
+    
+	FILE * fp = fopen(pname,"rb");
+	if (fp) {
+	      
+				fread (params,fstatus.st_size,1,fp);
+				params[fstatus.st_size] = 0;
+				char * start, * end;
+			 	
+				if (start = strstr(params,"http_port="))
+					listenport = atoi (start+10);
+					
+				if (start = strstr(params,"log_interval="))
+					log_interval = atoi (start+13);	
+				if (start = strstr(params,"req_interval="))
+					req_interval = atoi (start+13);	
+				if (start = strstr(params,"pow_interval="))
+					pow_interval = atoi (start+13);	
+				
+				
+				end = NULL;	
+				if (start = strstr(params,"serial_port=")) {
+					start+=12;
+				  if (! (end = strstr(start,";"))) 
+				  	if ( !(end = strstr(start,"\r\n")))
+				  		if ( !(end = strstr(start,"\n")))
+				  			end = strstr(start,"\r");
+					if (end) {
+						serialport=calloc(end-start+1,1);
+						memcpy(serialport, start,end-start);
+				    printf("%s\r\n",serialport);
+						}
+				}	
+				
+				end = NULL;	
+				if (start = strstr(params,"tmp_path=")) {
+					start+=9;
+				 if (! (end = strstr(start,";"))) 
+				  	if ( !(end = strstr(start,"\r\n")))
+				  		if ( !(end = strstr(start,"\n")))
+				  			end = strstr(start,"\r");
+					if (end) {
+						tmp_path=calloc(end-start+1,1);
+						memcpy(tmp_path, start,end-start);
+						}
+				}	
+				
+				end = NULL;	
+				if (start = strstr(params,"log_path=")) {
+					start+=9;
+				  if (! (end = strstr(start,";"))) 
+				  	if ( !(end = strstr(start,"\r\n")))
+				  		if ( !(end = strstr(start,"\n")))
+				  			end = strstr(start,"\r");
+					if (end) {
+						log_path=calloc(end-start+1,1);
+						memcpy(log_path, start,end-start);
+						}
+				}	
+				int a;
+				int ct = 0;
+				char key[30];
+				start=params;
+				while (start = strstr(start,"inverterid_")) {
+				   ct++;
+				   start++;
+				 }
+			
+				AEDevices =calloc(ct,sizeof(int));
+				SchuecoID =calloc(ct,sizeof(int));
+				AEDevicesComment =calloc(ct,sizeof(char *));
+				AENumDevices=ct;
+				AEData = calloc(AENumDevices * sizeof(struct sAEData),1);
+			
+				for (a=0; a<AENumDevices; a++) 
+					  AEData[a].AE_Offline = 1;
+				
+				for (a=0; a<ct; a++){
+					snprintf(key,29,"inverterid_%d=",a);
+					if (start=strstr(params,key)) 
+						AEDevices[a]=atoi(start+strlen(key));
+				}
+				
+				for (a=0; a<ct; a++){
+					snprintf(key,29,"inverterreduce_%d=",a);
+					if (start=strstr(params,key)) {
+						printf("---%s----\r\n",start+strlen(key));fflush(stdout);
+						AEData[a].AE_Reduzierung_set=(double)atoi(start+strlen(key));
+					}
+				}
+				
+					for (a=0; a<ct; a++){
+					snprintf(key,29,"schuecoid_%d=",a);
+					if (start=strstr(params,key)) {
+						SchuecoID[a]=atoi(start+strlen(key));
+					}
+				}
+			
+				for (a=0; a<ct; a++){
+					snprintf(key,29,"invertercomment_%d=",a);
+					if (start=strstr(params,key)) {
+						if (! (end = strstr(start,";"))) 
+				  	if ( !(end = strstr(start,"\r\n")))
+				  		if ( !(end = strstr(start,"\n")))
+				  			end = strstr(start,"\r");
+					  if (end) {
+						AEDevicesComment[a]=calloc(end-start+1,1);
+						memcpy(AEDevicesComment[a], start+strlen(key),end-start-strlen(key));
+					 } 
+					}
+				}
+				free (params);
+			  }
+   else {
+  	 printf("Kann aeclogger.ini nicht lesen !\r\n");
+  	 exit(0);
+     }  			  
 }
 //**********************************************************
 
@@ -2079,7 +2106,7 @@ void LoadLogArchive (int idx, int keep)
 		 	 loglist[idx].aptr=NULL;
 		   }
 
-		 printf("ArchiveLogEntries %s -> %ld   %f (%d %d %d)\r\n",fname,  loglist[idx].len, loglist[idx].yield,loglist[idx].logday,loglist[idx].logweek,loglist[idx].logyear);
+		 //printf("ArchiveLogEntries %s -> %ld   %f (%d %d %d)\r\n",fname,  loglist[idx].len, loglist[idx].yield,loglist[idx].logday,loglist[idx].logweek,loglist[idx].logyear);
 
 	  }
 	else {
@@ -3196,12 +3223,12 @@ int AE_Request (int idx, unsigned short type, int value)
   
   if (r>0)  r = AE_Analyze (sbuf, r);
   	
-  if (AEData[idx].AE_Offline == 1) 		
-      printf ("%s Offline RQ[%d] %d (%d)\r\n",getTimeString(),idx,type,r);fflush(stdout);
+//  if (AEData[idx].AE_Offline == 1) 		
+//      printf ("%s Offline RQ[%d] %d (%d)\r\n",getTimeString(),idx,type,r);fflush(stdout);
 
   		
   if (r==0) {  // Error - no Answer or wrong CS
-    printf ("%s Error RQ[%d] %d (%d)\r\n",getTimeString(),idx,type,r);fflush(stdout);
+//    printf ("%s Error RQ[%d] %d (%d)\r\n",getTimeString(),idx,type,r);fflush(stdout);
 
   	// Wenn das erste mal offline ...
      if (AEData[idx].AE_Offline == 0) {
@@ -3213,7 +3240,7 @@ int AE_Request (int idx, unsigned short type, int value)
 		 else  
 		  	 AEData[idx].AE_Offline_ct++;
 		 AEData[idx].AE_Offline = 1;
-		 printf ("%s offline[%d] (%d)\r\n",getTimeString(),idx,AEData[idx].AE_Offline_ct);fflush(stdout);
+		 //printf ("%s offline[%d] (%d)\r\n",getTimeString(),idx,AEData[idx].AE_Offline_ct);fflush(stdout);
      }
     else {  // Success
   	  AEData[idx].AE_Lastrequest_ts = time(NULL); 
@@ -3221,7 +3248,7 @@ int AE_Request (int idx, unsigned short type, int value)
 		  if (AEData[idx].AE_Offline) 
 		 	   if ((AEData[idx].AE_Lastrequest_ts > AEData[idx].AE_Offline_ts + 600) ||
 		 		      (AEData[idx].AE_Lastrequest_ts < AEData[idx].AE_Offline_ts + 60 && AEData[idx].AE_Offline_ct == 1)) {
-		 		      	  printf ("%s online[%d]\r\n",getTimeString(),idx);fflush(stdout);
+		 		      	  //printf ("%s online[%d]\r\n",getTimeString(),idx);fflush(stdout);
 		     		  	  AEData[idx].AE_Offline = 0;
 				 		  	  AEData[idx].AE_Offline_ct = 0;
 				 		  	  AEData[idx].AE_Online_ts = time(NULL);
@@ -3409,7 +3436,7 @@ int main (int argc, char *argv[])
   int overtake = 0;
   int fdc;
  
-  while ((c = getopt (argc, argv, "p:do")) != -1){
+  while ((c = getopt (argc, argv, "p:c:do")) != -1){
 	   switch (c) {
 	     case 'd':
 	       dontfork = 1;
@@ -3421,6 +3448,10 @@ int main (int argc, char *argv[])
 	       program_path = malloc (strlen(optarg)+1);
 	       strcpy (program_path,optarg);
 	       break;
+	     case 'c':
+	       param_path = malloc (strlen(optarg)+1);
+	       strcpy (param_path,optarg);
+	       break;  
 	     default:
 	     	 printf("unbekannter Parameter %c  - Abbruch",c);
 	       exit(0);
@@ -3429,6 +3460,9 @@ int main (int argc, char *argv[])
   
   if (program_path==NULL) 
   	 program_path = default_path; 
+  	 
+  if (param_path==NULL) 
+  	 param_path = default_path; 
   
    getParameters ();
    init_fdarrays();
@@ -3461,6 +3495,7 @@ int main (int argc, char *argv[])
   	
   
   printf("Starte AECLogger mit \r\n\r\n\t Programmpfad='%s'\r\n"
+  	                                  "\t Config='%saeclogger.ini'\r\n"
                                       "\t Debug=%d\r\n"
                                       "\t HTTP-Port=%d\r\n"
                                       "\t HS485-Port='%s'\r\n"
@@ -3470,7 +3505,7 @@ int main (int argc, char *argv[])
                                       "\t Logrequest Intervall= %d Sek.\r\n"
                                       "\t Powerrequest Intervall= %d Sek.\r\n"
                                       "\r\nEingetragene Inverter:\r\n\r\n",
-          program_path, dontfork, listenport, serialport, tmp_path, log_path, log_interval,req_interval,pow_interval);
+          program_path,param_path, dontfork, listenport, serialport, tmp_path, log_path, log_interval,req_interval,pow_interval);
   
   
   buildLogList();
