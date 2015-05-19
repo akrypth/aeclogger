@@ -6,9 +6,6 @@
 The program-logic regarding the RS485 communication-protocol is based on re-engineering the Java-Application (AESolar) from AEConversion.<p align="center">
 
 
-<p align="center"><img src="https://cloud.githubusercontent.com/assets/11571481/7519738/5f177efc-f4e2-11e4-99d4-34f4cf9cb539.jpg" width="700" align="middle"></p>
+<p align="center"><img src="https://cloud.githubusercontent.com/assets/11571481/7700283/e1ee2512-fe1d-11e4-8749-45461d8e21de.jpg" width="700" align="middle"></p>
  
 <p align="center"><b >For further information see the AECLogger-Wiki</b></p>
-
-
-
