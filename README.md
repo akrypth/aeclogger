@@ -11,4 +11,3 @@ The program-logic regarding the RS485 communication-protocol is based on re-engi
 <p align="center"><b >For further information see the AECLogger-Wiki</b></p>
 
 
-
