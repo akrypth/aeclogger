@@ -1,4 +1,4 @@
-#include <fcntl.h> 
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -15,6 +15,7 @@
 #include <dirent.h>
 #include <sys/types.h>
 #include <errno.h>
+#include <sys/klog.h>
 
 
 #define FMT_RAW 0
@@ -43,7 +44,7 @@
 #define F_PARAM 6
 #define F_STATISTIK 7
 
-const char Version[] = "0.15";
+const char Version[] = "0.16";
 const double sqr2 = 1.414213562373095;
 
 
@@ -80,6 +81,9 @@ char * param_path = NULL;
 char * tmp_path;
 char * log_path;
 time_t startuptime;	
+time_t tslastserial;
+int serialid=1000;
+
 int logit = 4;
 
 int globalgetsize;
@@ -125,7 +129,7 @@ long logtime;
 		void saveDayLog (int, int);
 		void saveLiveLog (int , int);
 		void init_fdarrays();
-		
+    unsigned long millis (void);		
 		void printQueue (void); 
 //<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
@@ -342,6 +346,60 @@ char * getTimeString(void)
 	strftime (stimebuffer,49,"%d.%B.%Y %H:%M:%S",timeinfo);
 	return stimebuffer;
 }
+
+
+//**********************************************************************
+
+
+/************************************************\
+    Kernel-Ringbuffer handling for USB
+\************************************************/
+
+
+
+int getUSBID ( void)
+{
+	char * rBuffer = NULL;
+  int usbid;
+	int len =  klogctl(10, NULL, 0);
+	
+	if (serialport != NULL)
+		 free(serialport);
+	serialport = malloc (20);	 
+	
+	printf("size %d\r\n",len);
+	rBuffer = malloc(len);
+	int rlen = klogctl(3,rBuffer,len);
+	
+	
+  char delimiter[] = "\n";
+  char *ptr;
+
+  ptr = strtok(rBuffer, delimiter);
+
+  while(ptr != NULL) {
+	 
+	  if (strstr(ptr,"usb 2-1.2: FTDI USB Serial Device converter now attached to ")) {
+	     char *p = strstr(ptr,"ttyUSB");
+	     usbid = atoi(p+6);
+	  	 //printf(" %s\n", ptr);
+
+	     }
+ 	  ptr = strtok(NULL, delimiter);
+  }
+	free(rBuffer);
+	
+	sprintf(serialport,"/dev/ttyUSB%d",usbid);
+	if (serialid != usbid) {
+		serialid = usbid;
+		return 1;
+	}
+	return 0;
+}
+
+
+
+//**********************************************************************
 
 /************************************************\
     RS485-queries  queue handling
@@ -1054,6 +1112,8 @@ void changeLogDay(void)
 
 void write_st (int fd, char *msg, ...)
 {
+ int r = 0;
+ unsigned long m = millis();
  if (fd == 0) return; 
  va_list ap;
  char * buf;
@@ -1064,7 +1124,9 @@ void write_st (int fd, char *msg, ...)
  va_start(ap, msg);
  vsprintf(buf, msg, ap);
  va_end(ap); 
- write(fd, buf, strlen(buf) );
+ do {
+    r += write(fd, buf+r, strlen(buf)-r );
+  } while (r < strlen(buf) || millis()- m > 1500); 
  free(buf);  
 }
 
@@ -1343,7 +1405,7 @@ int initEventListenSocket (void)
     } while (ctr && res <0);
    
   if (res < 0) {  
-     error("ERRBIND");
+     printf("ERRBIND"); fflush(stdout);;
      exit(0);
     }
   listen(eventfd,20);
@@ -1359,7 +1421,9 @@ int initEventListenSocket (void)
 void initSerialPort ()
 {
 	struct termios options;
- 
+  
+  if (serialfd != 0) close(serialfd);
+  printf("open serial %s\r\n",serialport);
 	serialfd = open(serialport, O_RDWR | O_NOCTTY | O_NDELAY);
  
 	if (serialfd == -1) {
@@ -1412,11 +1476,21 @@ void getParameters(void)
     }  
 	
 	
-    
+  int fctr = 0;
+  char * line;  
 	FILE * fp = fopen(pname,"rb");
 	if (fp) {
+	      while (!feof(fp)) {
+	      	line = fgets(params+fctr,300,fp);
+	      	printf("%s\r\n",line);
+	      	if (line)
+	      	 	if (line[0]!='|')
+	      		fctr+=strlen(line);
+	      	
+	      }
 	      
-				fread (params,fstatus.st_size,1,fp);
+	      
+				//fread (params,fstatus.st_size,1,fp);
 				params[fstatus.st_size] = 0;
 				char * start, * end;
 			 	
@@ -1534,23 +1608,26 @@ void getParameters(void)
 
 void init()
 {
+ 
  struct tm * timeinfo;
  long ts = time(NULL);	
  timeinfo = localtime(&ts);
  strftime (daylogname,20,"%d.%m.%Y.ael",timeinfo);
 
- 
+  
 
  snprintf(gzfname,15,"aes.%d.gz",getpid());
 
  sbuf = malloc(100);     
 
  createQueue(); 
-  
+ 
  FD_ZERO (&active_fd_set); 
   
- initSerialPort(); 
- initEventListenSocket(); 
+
+ initEventListenSocket();
+
+ 
 }
 
 //************************************************
@@ -2669,6 +2746,7 @@ int ReadSerial (void)
 				}
 			}
  serialactive = 0;
+ if (r > 0) tslastserial = time(NULL);
  return r;  
 }
 
@@ -2831,19 +2909,31 @@ char * AE_Print_Statistikdaten (int fmt)
  return s;				 	
 }
 
-
 //**********************************************************************
 
+void print_ev_data (void)
+{
+	char cmd[1000];
+		
+	sprintf(cmd,"/tmp/relais -csendevdata -p'?CMD=EVDATA&");
+	sprintf(cmd+strlen(cmd),"P00=d&", AEDeviceIndex);
+	sprintf(cmd+strlen(cmd),"P01=%1.3f&", AEData[AEDeviceIndex].AE_current_power);
+	sprintf(cmd+strlen(cmd),"P02=%1.3f'", AEData[AEDeviceIndex].AE_Reduzierung);
+	system (cmd);
+}
 
+//**********************************************************************
 
 void AE_Get_Ertragsdaten (char *buffer, int len)
 {
 	AEData[AEDeviceIndex].AE_current_power = AE_Get_FK16 ((char *)buffer+3);  // aktuelle Leistung
+	print_ev_data ();
 	double tmpyield = AE_Get_FK16 ((char *)buffer+7);
 	if (tmpyield > AEData[AEDeviceIndex].AE_today_yield) 
 		AEData[AEDeviceIndex].AE_today_yield = tmpyield;   // Summe heutige Leistung
 	AEData[AEDeviceIndex].AE_TS_Current = time(NULL);	
 	pushLiveLog(AEDeviceIndex);
+	
 }
 
 //**********************************************************************
@@ -3223,22 +3313,17 @@ int AE_Request (int idx, unsigned short type, int value)
   
   if (r>0)  r = AE_Analyze (sbuf, r);
   	
-//  if (AEData[idx].AE_Offline == 1) 		
-//      printf ("%s Offline RQ[%d] %d (%d)\r\n",getTimeString(),idx,type,r);fflush(stdout);
-
   		
   if (r==0) {  // Error - no Answer or wrong CS
-//    printf ("%s Error RQ[%d] %d (%d)\r\n",getTimeString(),idx,type,r);fflush(stdout);
-
   	// Wenn das erste mal offline ...
      if (AEData[idx].AE_Offline == 0) {
 		  	   AEData[idx].AE_Offline_ts = time(NULL);
 		 	     saveLiveLog (idx, 1);
 		 	     saveDayLog (idx, 1);
-		 	     
 		       }
 		 else  
 		  	 AEData[idx].AE_Offline_ct++;
+		  	 
 		 AEData[idx].AE_Offline = 1;
 		 //printf ("%s offline[%d] (%d)\r\n",getTimeString(),idx,AEData[idx].AE_Offline_ct);fflush(stdout);
      }
@@ -3247,7 +3332,7 @@ int AE_Request (int idx, unsigned short type, int value)
 		  // prüfen ob wieder online -  Aufwachen, seit 10 Minuten stabile Antworten auf requests oder innerhalb einer Minute ein Aussetzter
 		  if (AEData[idx].AE_Offline) 
 		 	   if ((AEData[idx].AE_Lastrequest_ts > AEData[idx].AE_Offline_ts + 600) ||
-		 		      (AEData[idx].AE_Lastrequest_ts < AEData[idx].AE_Offline_ts + 60 && AEData[idx].AE_Offline_ct == 1)) {
+		 		      (AEData[idx].AE_Lastrequest_ts < AEData[idx].AE_Offline_ts + 60 && AEData[idx].AE_Offline_ct <= 5)) {
 		 		      	  //printf ("%s online[%d]\r\n",getTimeString(),idx);fflush(stdout);
 		     		  	  AEData[idx].AE_Offline = 0;
 				 		  	  AEData[idx].AE_Offline_ct = 0;
@@ -3262,10 +3347,15 @@ int AE_Request (int idx, unsigned short type, int value)
 
 //************************************************
 
-void write_reduce(int fd,int dev, int pow) 
+void write_reduce(int fd,int dev, int power) 
 {
- AEData[dev].AE_Reduzierung_set = (double)pow;	
- AE_Request (dev,SET_LEISTUNGSREDUZIERUNG,pow);
+ double value;	
+ if (power < 0 || power > 450)	
+ 	 value = 0;
+ else 
+ 	 value = (double)power;	 
+ AEData[dev].AE_Reduzierung_set = value;	
+ AE_Request (dev,SET_LEISTUNGSREDUZIERUNG,value);
  send_http_header(fd,200);
  AE_Request (dev,GET_LEISTUNGSREDUZIERUNG,0);
 }
@@ -3430,6 +3520,7 @@ int main (int argc, char *argv[])
   time_t current_time;
   time_t reqticker=0;
   time_t logticker=LONG_MAX;
+  time_t usbticker=0;
   time_t powticker=0;
   startuptime=time(NULL);
   int c;
@@ -3466,7 +3557,7 @@ int main (int argc, char *argv[])
   
    getParameters ();
    init_fdarrays();
-   
+   printf("COMM 1\r\n");fflush(stdout);
    if (overtake) {
 	   char * answer = sendgetrequest ("?CMD=OVERTAKE","127.0.0.1", listenport,NULL);
 	   if (globalgetsize > 0)
@@ -3475,7 +3566,8 @@ int main (int argc, char *argv[])
 	  	  	free(answer);
 	  	  }
      } 
-   else {  
+   else { 
+   	 printf("COMM 2\r\n");fflush(stdout); 
 	   char * answer = sendgetrequest ("?CMD=ISALIVE","127.0.0.1", listenport,NULL);
 	   if (globalgetsize > 0)
 	  	  if (strstr(answer,"AECLOGGEROK")) {
@@ -3490,10 +3582,8 @@ int main (int argc, char *argv[])
 	  if (pid > 0) { _exit(0);} // exit this process we forked successful
 	  setsid(); 
   }
-   
-  init(); 
-  	
-  
+  printf("!!!\r\n");fflush(stdout);
+ 
   printf("Starte AECLogger mit \r\n\r\n\t Programmpfad='%s'\r\n"
   	                                  "\t Config='%saeclogger.ini'\r\n"
                                       "\t Debug=%d\r\n"
@@ -3506,6 +3596,9 @@ int main (int argc, char *argv[])
                                       "\t Powerrequest Intervall= %d Sek.\r\n"
                                       "\r\nEingetragene Inverter:\r\n\r\n",
           program_path,param_path, dontfork, listenport, serialport, tmp_path, log_path, log_interval,req_interval,pow_interval);
+   init(); 
+  	 printf("!!!\r\n");fflush(stdout);
+  if (getUSBID()) initSerialPort(); 
   
   
   buildLogList();
@@ -3544,7 +3637,19 @@ int main (int argc, char *argv[])
 				    }
 		  }
 		  else { // cyclic non-select
+		  	
+		  	
+		  	
 		  	 current_time = time(NULL);
+		  	
+		  	 if (usbticker <= current_time) {
+		  	 	 usbticker = current_time +300;
+		  	   if (current_time - tslastserial > 20)
+		  	       if (getUSBID()) 
+		  	       	  initSerialPort(); 
+		  	   	
+		  	   }
+		  	
 		  	 if (logticker <= current_time) {  // LOG
              //if min. one inv active -> push logs        
 		  	 	   logticker = current_time + log_interval;

@@ -1,4 +1,4 @@
-﻿##1 
+##1 
 
 ##10
 | 
@@ -167,7 +167,7 @@
 
 </script></head>	
 
-<body onload="initMainform();" style='width:900px;xbackground-color:#ffffff; xbackground-color:#F5F6F7; margin:0px auto; border: 0px solid red ; padding 0px;'> 
+<body onloadx="initMainform();" style='width:900px;xbackground-color:#ffffff; xbackground-color:#F5F6F7; margin:0px auto; border: 0px solid red ; padding 0px;'> 
 
 <div id="fade" onClick="lclose('');"></div>
 <div id="overlay" > <!-- WR Auswahl -->
@@ -196,6 +196,9 @@
 </div>
 <iframe  style='position:absolute; top:49px;' name= 'display' id='dframe' src='' allowTransparency='true' width='900px' height='540px' scrolling='no' frameborder='0' style=' margin:0px; padding:0px;'>
 </iframe>
+<script type="text/javascript">
+	initMainform();
+</script>	
 </body></html>
 
 | ******************************************************************* WR - Details *******************************************************************
@@ -480,6 +483,7 @@ function setvaluefield(pos, val) {
 
 	     		        chartDayLog.options.data[1].axisYType = "secondary";
 	     		        chartDayLog.options.data[1].type = "line";
+	     		        chartDayLog.options.data[1].lineDashType = "dash";
 
 	   	            break;
 	   	  case "2": setvaluefield(2,1); // power dc
@@ -648,7 +652,7 @@ function createCharts() {
 				              indexLabelPlacement: "outside",  
 				              indexLabelOrientation: "horizontal",
 				              indexLabelFontColor: "#111111",
-                      indexLabelFontSize: 13,
+                      indexLabelFontSize: 11,
 							    		markerType:"none",	    
 							    	  color:"transparent", 
 							    	  type: "line",
@@ -789,6 +793,12 @@ function createCharts() {
 }
  
  function initCharts(){
+ 	//var ex =  document.getElementById('id_wr_text');
+  //if (typeof(ex) == 'undefined' || ex == null) {
+  //  setTimeout('initCharts();',100);
+   // return;
+   // } 
+ 	
    document.cookie="menu=wr-details"+deviceindex+";";
  	 document.getElementById('id_wr_text').innerHTML=devicedata.devices[deviceindex].id+" - "+devicedata.devices[deviceindex].name;
  	 devicefield = "";
@@ -842,7 +852,7 @@ function createCharts() {
   
 </script></head>
 
-<body  onload="initCharts();" style='width:100%%px; margin:auto; border: 0px; padding 0px;font-family:arial;font-size:15px;'> 
+<body  onloadx="initCharts();" style='width:100%%px; margin:auto; border: 0px; padding 0px;font-family:arial;font-size:15px;'> 
 
 | hidden elements
 
@@ -959,6 +969,10 @@ function createCharts() {
 
 <canvas id="Canvas2" style='display:block;position:absolute; top:280px; left:0px; height: 260px; width:100%%; z-index:105; border-radius: 6px;'></canvas>
 <canvas id="Canvas1" style='display:block;position:absolute; top:0px; left:0px; height: 100%%; width:100%%; z-index:-100;border-radius: 6px; '></canvas>
+<script type="text/javascript">
+	initCharts();
+	//alert("HALLO");
+</script>	
 </body>
 
 
@@ -1021,8 +1035,7 @@ function createCharts() {
 	
 	function reload_daten(_target, _key){
 	   var rq = new XMLHttpRequest();
-	   rq.onreadystatechange=function()
-       {
+	   rq.onreadystatechange=function() {
        	if (rq.readyState==4 && rq.status==200)
            document.getElementById(_target).innerHTML=rq.responseText;
        }
@@ -1032,8 +1045,7 @@ function createCharts() {
 
   function refresh_current_overview() {  // Barchart
 	   var rq = new XMLHttpRequest();
-	   rq.onreadystatechange=function()
-       {
+	   rq.onreadystatechange=function() {
        	if (rq.readyState==4 && rq.status==200)
          {
          	jdata = JSON.parse(rq.responseText);
@@ -1301,6 +1313,11 @@ chartStatusBar = new window.parent.CanvasJS.Chart(document.getElementById("chart
    }
 
  function initCharts(){
+   var ex =  document.getElementById('Canvas1');
+  if (typeof(ex) == 'undefined' || ex == null) {
+    setTimeout('initCharts();',100);
+    return;
+    } 
  	 document.cookie="menu=wr-overview;";
  	 devicefield="";
  	 createCharts();
@@ -1428,7 +1445,7 @@ chartStatusBar = new window.parent.CanvasJS.Chart(document.getElementById("chart
 </script>
 </head>
 
-<body onload="initCharts();">
+<body onloadx="initCharts();">
 <div style='width:100%%; height:100%%;background-color:transparent'>
 
 <div style='display:none; position:absolute; margin:0px;top:8px; right:25px;font-size:14px;font-family:arial;z-index:60;'>	
@@ -1459,8 +1476,10 @@ chartStatusBar = new window.parent.CanvasJS.Chart(document.getElementById("chart
 
 <canvas id="Canvas2" style='display:block;position:absolute; top:280px; left:0px; height: 260px; width:100%%; z-index:105; border-radius: 6px;'></canvas>
 <canvas id="Canvas1" style='display:block;position:absolute; top:0px; left:0px; height: 100%%; width:100%%; z-index:-100;border-radius: 6px; '></canvas>
-
-</body>
+<script type="text/javascript">
+	initCharts();
+</script>	
+</body></html>
 
 
 
@@ -2016,7 +2035,7 @@ function initCharts(){
   
 </script></head>
 
-<body onload="init_page();" >
+<body onloadx="init_page();" >
 <div>
  <div style='position:absolute; margin:0px;top:5px;right:5px;font-size:15px;width:290px;font-family:arial; z-index:150;border: 0px solid blue;'>	
     <select onchange='setInitialDateRange();' id='combo_granularity'  size='1' name='rcombo' style='padding:2px;border-radius: 5px;border:2px solid #8888aa;margin:5px;font-size:16px;background-color:#FAFAFF;'>
@@ -2058,9 +2077,11 @@ function initCharts(){
 <canvas id="Canvas2" style='display:block;position:absolute; top:240px; left:0px; height: 300px; width:100%%; z-index:105; border-radius: 6px;'></canvas>
 <canvas id="Canvas1" style='display:block;position:absolute; top:0px; left:0px; height: 100%%; width:100%%; z-index:-100;border-radius: 6px; '></canvas>
 
-</div
-
-</body>
+</div>
+<script type="text/javascript">
+	init_page();
+</script>	
+</body></html>
 
 |************************************************************** OFFLINE **************************************************************************
 ##100
