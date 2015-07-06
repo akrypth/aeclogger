@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -44,7 +45,7 @@
 #define F_PARAM 6
 #define F_STATISTIK 7
 
-const char Version[] = "0.16";
+const char Version[] = "0.17";
 const double sqr2 = 1.414213562373095;
 
 
@@ -75,6 +76,7 @@ int pow_interval=5;
 
 int listenport=3038;
 char * serialport;
+char * serialidentifier;
 char * program_path = NULL;
 char default_path[] = "./";
 char * param_path = NULL;
@@ -379,7 +381,8 @@ int getUSBID ( void)
 
   while(ptr != NULL) {
 	 
-	  if (strstr(ptr,"usb 2-1.2: FTDI USB Serial Device converter now attached to ")) {
+	  //if (strstr(ptr,"usb 2-1.2: FTDI USB Serial Device converter now attached to ")) {
+	  if (strstr(ptr,serialidentifier)) {
 	     char *p = strstr(ptr,"ttyUSB");
 	     usbid = atoi(p+6);
 	  	 //printf(" %s\n", ptr);
@@ -1021,10 +1024,10 @@ void pushLiveLog (int idx)
 {
 	int a; 
 	
-//	for (idx=0; idx<AENumDevices; idx++) {
 			if (AELiveLogPos[idx] == AELiveLogSize[idx]-1) { 
-				for (a=0; a<AELiveLogSize[idx]-1; a++)
-				 AELiveLog[idx][a] =  AELiveLog[idx][a+1];
+				memmove (AELiveLog[idx], &(AELiveLog[idx][a+1]), (AELiveLogSize[idx]-1)*sizeof(struct sAELiveLog)) ;
+//				for (a=0; a<AELiveLogSize[idx]-1; a++)
+//				 AELiveLog[idx][a] =  AELiveLog[idx][a+1];
 			  }
 			
 			AELiveLog[idx][AELiveLogPos[idx]].ts = AEData[idx].AE_TS_Current;
@@ -1045,7 +1048,6 @@ void pushLiveLog (int idx)
 		  	saveLiveLog(idx,1);
 		  	AELiveLogCounter[idx]=0;
 		  }
- // }
 }
 
 //************************************************
@@ -1518,7 +1520,19 @@ void getParameters(void)
 				    printf("%s\r\n",serialport);
 						}
 				}	
-				
+				end = NULL;	
+				if (start = strstr(params,"serial_identifier=")) {
+					start+=18;
+				  if (! (end = strstr(start,";"))) 
+				  	if ( !(end = strstr(start,"\r\n")))
+				  		if ( !(end = strstr(start,"\n")))
+				  			end = strstr(start,"\r");
+					if (end) {
+						serialidentifier=calloc(end-start+1,1);
+						memcpy(serialidentifier, start,end-start);
+				    printf("%s\r\n",serialidentifier);
+						}
+				}		
 				end = NULL;	
 				if (start = strstr(params,"tmp_path=")) {
 					start+=9;
@@ -3190,8 +3204,11 @@ int AE_CheckAnswer (unsigned char * buffer, int len)
 {
 	int a;
 	unsigned char cs = 0;
-	for (a=1; a<len-2; a++)
+	for (a=1; a<len-2; a++){
+		 if (buffer[a] == 0x40 && buffer[a+1] == 0x0d) continue;
+	   if (buffer[a] == 0x40 && buffer[a+1] == 0x40) continue;
 	   cs ^= buffer[a];
+	  }
 	   
 	   
 //Dump_Buffer(buffer,len,cs); 	   
@@ -3582,7 +3599,6 @@ int main (int argc, char *argv[])
 	  if (pid > 0) { _exit(0);} // exit this process we forked successful
 	  setsid(); 
   }
-  printf("!!!\r\n");fflush(stdout);
  
   printf("Starte AECLogger mit \r\n\r\n\t Programmpfad='%s'\r\n"
   	                                  "\t Config='%saeclogger.ini'\r\n"
@@ -3596,8 +3612,8 @@ int main (int argc, char *argv[])
                                       "\t Powerrequest Intervall= %d Sek.\r\n"
                                       "\r\nEingetragene Inverter:\r\n\r\n",
           program_path,param_path, dontfork, listenport, serialport, tmp_path, log_path, log_interval,req_interval,pow_interval);
-   init(); 
-  	 printf("!!!\r\n");fflush(stdout);
+  init(); 
+   
   if (getUSBID()) initSerialPort(); 
   
   
