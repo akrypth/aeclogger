@@ -45,7 +45,7 @@
 #define F_PARAM 6
 #define F_STATISTIK 7
 
-const char Version[] = "0.17";
+const char Version[] = "0.18";
 const double sqr2 = 1.414213562373095;
 
 
@@ -86,6 +86,7 @@ time_t startuptime;
 time_t tslastserial;
 int serialid=1000;
 
+int datalog_active=0;
 int logit = 4;
 
 int globalgetsize;
@@ -357,9 +358,7 @@ char * getTimeString(void)
     Kernel-Ringbuffer handling for USB
 \************************************************/
 
-
-
-int getUSBID ( void)
+int getUSBID ( char * identifier)
 {
 	char * rBuffer = NULL;
   int usbid;
@@ -381,11 +380,9 @@ int getUSBID ( void)
 
   while(ptr != NULL) {
 	 
-	  //if (strstr(ptr,"usb 2-1.2: FTDI USB Serial Device converter now attached to ")) {
-	  if (strstr(ptr,serialidentifier)) {
+	  if (strstr(ptr,identifier)) {
 	     char *p = strstr(ptr,"ttyUSB");
 	     usbid = atoi(p+6);
-	  	 //printf(" %s\n", ptr);
 
 	     }
  	  ptr = strtok(NULL, delimiter);
@@ -1585,7 +1582,7 @@ void getParameters(void)
 				for (a=0; a<ct; a++){
 					snprintf(key,29,"inverterreduce_%d=",a);
 					if (start=strstr(params,key)) {
-						printf("---%s----\r\n",start+strlen(key));fflush(stdout);
+						//printf("---%s----\r\n",start+strlen(key));fflush(stdout);
 						AEData[a].AE_Reduzierung_set=(double)atoi(start+strlen(key));
 					}
 				}
@@ -1628,6 +1625,9 @@ void init()
  timeinfo = localtime(&ts);
  strftime (daylogname,20,"%d.%m.%Y.ael",timeinfo);
 
+ struct  stat fstatus; 
+ if (stat("/tmp/relais", &fstatus) == 0) 
+    datalog_active = 1;
   
 
  snprintf(gzfname,15,"aes.%d.gz",getpid());
@@ -2747,8 +2747,7 @@ int ReadSerial (void)
  	   else {
  	   	   usleep(50000);
  	   	   }
-   } while (millis() < mstart+500); // timeout 1 sec
-  
+   } while (millis() < mstart+2500); // timeout 1 sec
     if (logit & 0x02) {
 				 int a;
 				 if (r>0) {
@@ -2930,9 +2929,10 @@ void print_ev_data (void)
 	char cmd[1000];
 		
 	sprintf(cmd,"/tmp/relais -csendevdata -p'?CMD=EVDATA&");
-	sprintf(cmd+strlen(cmd),"P00=d&", AEDeviceIndex);
+	sprintf(cmd+strlen(cmd),"P00=%d&", AEDeviceIndex);
 	sprintf(cmd+strlen(cmd),"P01=%1.3f&", AEData[AEDeviceIndex].AE_current_power);
-	sprintf(cmd+strlen(cmd),"P02=%1.3f'", AEData[AEDeviceIndex].AE_Reduzierung);
+	sprintf(cmd+strlen(cmd),"P02=%1.3f&", AEData[AEDeviceIndex].AE_Reduzierung);
+	sprintf(cmd+strlen(cmd),"P03=%1.3f'", AEData[AEDeviceIndex].AE_today_yield);
 	system (cmd);
 }
 
@@ -2941,7 +2941,7 @@ void print_ev_data (void)
 void AE_Get_Ertragsdaten (char *buffer, int len)
 {
 	AEData[AEDeviceIndex].AE_current_power = AE_Get_FK16 ((char *)buffer+3);  // aktuelle Leistung
-	print_ev_data ();
+	if (datalog_active) print_ev_data ();
 	double tmpyield = AE_Get_FK16 ((char *)buffer+7);
 	if (tmpyield > AEData[AEDeviceIndex].AE_today_yield) 
 		AEData[AEDeviceIndex].AE_today_yield = tmpyield;   // Summe heutige Leistung
@@ -2958,8 +2958,6 @@ void AE_Get_Status (char *buffer, int len)
 	AEData[AEDeviceIndex].AE_Status_Fehler = AE_Get_INT ((char *)buffer+3+(1*4));  
 	AEData[AEDeviceIndex].AE_Status_Stoerung = AE_Get_INT ((char *)buffer+3+(2*4)); 
 	AEData[AEDeviceIndex].AE_TS_Status = time(NULL);
-	
-	//printf("%04X  %04X  %04X\r\n",AEData[AEDeviceIndex].AE_Status_Betrieb,AEData[AEDeviceIndex].AE_Status_Fehler,AEData[AEDeviceIndex].AE_Status_Stoerung);
 }
 
 //************************************************
@@ -2973,18 +2971,18 @@ char * AE_Print_Bit_Betrieb (int fmt, int index)
 	if (fmt == FMT_HTML) {
 		char * txt = getText(45);
 		
-		sprintf(s+strlen(s),txt,"READY (AC)",(AEData[AEDeviceIndex].AE_Status_Betrieb & (1<<0)) > 0 ? "1-OK"   : "ERR");
-		sprintf(s+strlen(s),txt,"ENOUGH_ENERGY:(DC)",(AEData[AEDeviceIndex].AE_Status_Betrieb & (1<<1)) > 0 ? "1-OK"   : "ERR");
-		sprintf(s+strlen(s),txt,"MPP_INITIALIZED:",(AEData[AEDeviceIndex].AE_Status_Betrieb & (1<<2)) > 0 ? "1"      : "0");
-		sprintf(s+strlen(s),txt,"POWER_LIMIT:",(AEData[AEDeviceIndex].AE_Status_Betrieb & (1<<3)) > 0 ? "RED." : "0-OK");
-		sprintf(s+strlen(s),txt,"TRANSMIT:",(AEData[AEDeviceIndex].AE_Status_Betrieb & (1<<4)) > 0 ?  "1" : "0");
-		sprintf(s+strlen(s),txt,"CALIBRATE:",(AEData[AEDeviceIndex].AE_Status_Betrieb & (1<<5)) > 0 ?  "1" : "0");
-		sprintf(s+strlen(s),txt,"STORE_SETUP:",(AEData[AEDeviceIndex].AE_Status_Betrieb & (1<<6)) > 0 ?  "1" : "0");
-		sprintf(s+strlen(s),txt,"ATTINY_OK:",(AEData[AEDeviceIndex].AE_Status_Betrieb & (1<<7)) > 0 ?  "1-OK" : "0-ERR");
-		sprintf(s+strlen(s),txt,"REGLER_GESPERR:",(AEData[AEDeviceIndex].AE_Status_Betrieb & (1<<8)) > 0 ?  "1-ERR" : "0-OK");
-		sprintf(s+strlen(s),txt,"ATTINY_PARAM_OK:",(AEData[AEDeviceIndex].AE_Status_Betrieb & (1<<9)) > 0 ?  "1-OK" : "0-ERR");
-		sprintf(s+strlen(s),txt,"STROMMANGEL:",(AEData[AEDeviceIndex].AE_Status_Betrieb & (1<<10)) > 0 ? "1-ERR" : "0-OK");
-		sprintf(s+strlen(s),txt,"SYNC (AC):",(AEData[AEDeviceIndex].AE_Status_Betrieb & (1<<11)) > 0 ? "1-OK" : "0-ERR");
+		sprintf(s+strlen(s),txt,"READY (AC)",(AEData[index].AE_Status_Betrieb & (1<<0)) > 0 ? "1-OK"   : "ERR");
+		sprintf(s+strlen(s),txt,"ENOUGH_ENERGY:(DC)",(AEData[index].AE_Status_Betrieb & (1<<1)) > 0 ? "1-OK"   : "ERR");
+		sprintf(s+strlen(s),txt,"MPP_INITIALIZED:",(AEData[index].AE_Status_Betrieb & (1<<2)) > 0 ? "1"      : "0");
+		sprintf(s+strlen(s),txt,"POWER_LIMIT:",(AEData[index].AE_Status_Betrieb & (1<<3)) > 0 ? "RED." : "0-OK");
+		sprintf(s+strlen(s),txt,"TRANSMIT:",(AEData[index].AE_Status_Betrieb & (1<<4)) > 0 ?  "1" : "0");
+		sprintf(s+strlen(s),txt,"CALIBRATE:",(AEData[index].AE_Status_Betrieb & (1<<5)) > 0 ?  "1" : "0");
+		sprintf(s+strlen(s),txt,"STORE_SETUP:",(AEData[index].AE_Status_Betrieb & (1<<6)) > 0 ?  "1" : "0");
+		sprintf(s+strlen(s),txt,"ATTINY_OK:",(AEData[index].AE_Status_Betrieb & (1<<7)) > 0 ?  "1-OK" : "0-ERR");
+		sprintf(s+strlen(s),txt,"REGLER_GESPERR:",(AEData[index].AE_Status_Betrieb & (1<<8)) > 0 ?  "1-ERR" : "0-OK");
+		sprintf(s+strlen(s),txt,"ATTINY_PARAM_OK:",(AEData[index].AE_Status_Betrieb & (1<<9)) > 0 ?  "1-OK" : "0-ERR");
+		sprintf(s+strlen(s),txt,"STROMMANGEL:",(AEData[index].AE_Status_Betrieb & (1<<10)) > 0 ? "1-ERR" : "0-OK");
+		sprintf(s+strlen(s),txt,"SYNC (AC):",(AEData[index].AE_Status_Betrieb & (1<<11)) > 0 ? "1-OK" : "0-ERR");
 		free(txt);
 	}			 	
  return s;				 	
@@ -3001,33 +2999,33 @@ char * AE_Print_Bit_Fehler (int fmt, int index)
 	
 	if (fmt == FMT_HTML) {
 	  char * txt = getText(45);
-		sprintf(s+strlen(s),txt,"ERROR_TEMP_SENSOR",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<0)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_TEMP_HIGH",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<1)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_IAC_CRITICAL",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<2)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_UAC_HIGH",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<3)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_UAC_HIGH_CRITICAL",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<4)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_UAC_LOW_CRITICAL",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<6)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_FREQUENCY_LOW",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<7)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_FREQUENCY_HIGH",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<8)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_EEPROM_CRC",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<9)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_ATTINY_FREQ_LOW",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<10)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_ATTINY_FREQ_HIGH",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<11)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_ATTINY_UAC_LOW",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<12)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_ATTINY_UAC_HIGH",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<13)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_ATTINY_TIMEOUT",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<14)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_HOST_TIMEOUT",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<15)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_U_PV_HIGH",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<16)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_SOFORTABSCHALTUNG",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<17)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_INSELERKENNUNG",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<18)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_RELAIS_ATTINY",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<19)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_RELAIS_SAM7",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<20)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_RELAIS_ATTINY",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<21)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_AC_NOTAUS",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<22)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_ATTINY_UNPLAUSIBEL",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<23)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_DC_LEISTUNG",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<24)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_UAC_LOW",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<25)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_NEUSTART_VERBOTEN",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<26)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"ERROR_SURGETEST",(AEData[AEDeviceIndex].AE_Status_Fehler & (1<<27)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_TEMP_SENSOR",(AEData[index].AE_Status_Fehler & (1<<0)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_TEMP_HIGH",(AEData[index].AE_Status_Fehler & (1<<1)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_IAC_CRITICAL",(AEData[index].AE_Status_Fehler & (1<<2)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_UAC_HIGH",(AEData[index].AE_Status_Fehler & (1<<3)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_UAC_HIGH_CRITICAL",(AEData[index].AE_Status_Fehler & (1<<4)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_UAC_LOW_CRITICAL",(AEData[index].AE_Status_Fehler & (1<<6)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_FREQUENCY_LOW",(AEData[index].AE_Status_Fehler & (1<<7)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_FREQUENCY_HIGH",(AEData[index].AE_Status_Fehler & (1<<8)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_EEPROM_CRC",(AEData[index].AE_Status_Fehler & (1<<9)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_ATTINY_FREQ_LOW",(AEData[index].AE_Status_Fehler & (1<<10)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_ATTINY_FREQ_HIGH",(AEData[index].AE_Status_Fehler & (1<<11)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_ATTINY_UAC_LOW",(AEData[index].AE_Status_Fehler & (1<<12)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_ATTINY_UAC_HIGH",(AEData[index].AE_Status_Fehler & (1<<13)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_ATTINY_TIMEOUT",(AEData[index].AE_Status_Fehler & (1<<14)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_HOST_TIMEOUT",(AEData[index].AE_Status_Fehler & (1<<15)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_U_PV_HIGH",(AEData[index].AE_Status_Fehler & (1<<16)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_SOFORTABSCHALTUNG",(AEData[index].AE_Status_Fehler & (1<<17)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_INSELERKENNUNG",(AEData[index].AE_Status_Fehler & (1<<18)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_RELAIS_ATTINY",(AEData[index].AE_Status_Fehler & (1<<19)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_RELAIS_SAM7",(AEData[index].AE_Status_Fehler & (1<<20)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_RELAIS_ATTINY",(AEData[index].AE_Status_Fehler & (1<<21)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_AC_NOTAUS",(AEData[index].AE_Status_Fehler & (1<<22)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_ATTINY_UNPLAUSIBEL",(AEData[index].AE_Status_Fehler & (1<<23)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_DC_LEISTUNG",(AEData[index].AE_Status_Fehler & (1<<24)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_UAC_LOW",(AEData[index].AE_Status_Fehler & (1<<25)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_NEUSTART_VERBOTEN",(AEData[index].AE_Status_Fehler & (1<<26)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"ERROR_SURGETEST",(AEData[index].AE_Status_Fehler & (1<<27)) > 0 ? "1"   : "0");
 		free(txt);
 	}			 	
  return s;				 	
@@ -3043,21 +3041,21 @@ char * AE_Print_Bit_Stoerung (int fmt, int index)
 	
 	if (fmt == FMT_HTML) {
 		char * txt = getText(45);
-		sprintf(s+strlen(s),txt,"DISTURB_PLL_LOW",(AEData[AEDeviceIndex].AE_Status_Stoerung & (1<<0)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"DISTURB_ADC_CONVERSION",(AEData[AEDeviceIndex].AE_Status_Stoerung & (1<<1)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"DISTURB_UDC_OVERFLOW",(AEData[AEDeviceIndex].AE_Status_Stoerung & (1<<2)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"DISTURB_UDC_LOW",(AEData[AEDeviceIndex].AE_Status_Stoerung & (1<<3)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"DISTURB_IAC_HIGH",(AEData[AEDeviceIndex].AE_Status_Stoerung & (1<<4)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"DISTURB_IAC_ZERO",(AEData[AEDeviceIndex].AE_Status_Stoerung & (1<<5)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"DISTURB_PI_HIGH",(AEData[AEDeviceIndex].AE_Status_Stoerung & (1<<6)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"DISTURB_PI_LOW",(AEData[AEDeviceIndex].AE_Status_Stoerung & (1<<7)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"DISTURB_ADC_LOW",(AEData[AEDeviceIndex].AE_Status_Stoerung & (1<<8)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"DISTURB_FREQU_1",(AEData[AEDeviceIndex].AE_Status_Stoerung & (1<<9)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"DISTURB_FREQU_2",(AEData[AEDeviceIndex].AE_Status_Stoerung & (1<<10)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"DISTURB_FREQU_3",(AEData[AEDeviceIndex].AE_Status_Stoerung & (1<<11)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"DISTURB_FREQU_4",(AEData[AEDeviceIndex].AE_Status_Stoerung & (1<<12)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"DISTURB_FREQU_5",(AEData[AEDeviceIndex].AE_Status_Stoerung & (1<<13)) > 0 ? "1"   : "0");
-		sprintf(s+strlen(s),txt,"DISTURB_FREQU_6",(AEData[AEDeviceIndex].AE_Status_Stoerung & (1<<14)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"DISTURB_PLL_LOW",(AEData[index].AE_Status_Stoerung & (1<<0)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"DISTURB_ADC_CONVERSION",(AEData[index].AE_Status_Stoerung & (1<<1)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"DISTURB_UDC_OVERFLOW",(AEData[index].AE_Status_Stoerung & (1<<2)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"DISTURB_UDC_LOW",(AEData[index].AE_Status_Stoerung & (1<<3)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"DISTURB_IAC_HIGH",(AEData[index].AE_Status_Stoerung & (1<<4)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"DISTURB_IAC_ZERO",(AEData[index].AE_Status_Stoerung & (1<<5)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"DISTURB_PI_HIGH",(AEData[index].AE_Status_Stoerung & (1<<6)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"DISTURB_PI_LOW",(AEData[index].AE_Status_Stoerung & (1<<7)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"DISTURB_ADC_LOW",(AEData[index].AE_Status_Stoerung & (1<<8)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"DISTURB_FREQU_1",(AEData[index].AE_Status_Stoerung & (1<<9)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"DISTURB_FREQU_2",(AEData[index].AE_Status_Stoerung & (1<<10)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"DISTURB_FREQU_3",(AEData[index].AE_Status_Stoerung & (1<<11)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"DISTURB_FREQU_4",(AEData[index].AE_Status_Stoerung & (1<<12)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"DISTURB_FREQU_5",(AEData[index].AE_Status_Stoerung & (1<<13)) > 0 ? "1"   : "0");
+		sprintf(s+strlen(s),txt,"DISTURB_FREQU_6",(AEData[index].AE_Status_Stoerung & (1<<14)) > 0 ? "1"   : "0");
 		free(txt);
 	}			 	
  return s;				 	
@@ -3105,6 +3103,10 @@ void AE_Get_Fehlercode(char * buffer,int len )
 void AE_Get_Status_Leistungsreduzierung(char * buffer,int len )
 {
  AEData[AEDeviceIndex].AE_Reduzierung = AE_Get_FK16 ((char *)buffer+3+(0*4));	
+ 
+ if ((AEData[AEDeviceIndex].AE_Status_Betrieb & (1<<0)) <= 0  // NOT AC-READY
+ 	   || (AEData[AEDeviceIndex].AE_Status_Betrieb & (1<<11)) <= 0  ) // NO SYNC
+ 	   AEData[AEDeviceIndex].AE_Reduzierung = -1;
 }
 
 //**********************************************************************
@@ -3302,31 +3304,62 @@ int AE_Request (int idx, unsigned short type, int value)
 		cv.i = value * 65536;
 		req[ct++] = cv.b[3];
 		if (cv.b[3] == 0x40) req[ct++] = 0x40;
+		if (cv.b[3] == 0x0D) {
+			   req[ct-1] = 0x40;
+			   req[ct++] = 0x0D;
+		    }	
+			
 		req[ct++] = cv.b[2];
 		if (cv.b[2] == 0x40) req[ct++] = 0x40;
+			if (cv.b[2] == 0x0D) {
+			   req[ct-1] = 0x40;
+			   req[ct++] = 0x0D;
+		    }	
 		req[ct++] = cv.b[1];
 		if (cv.b[1] == 0x40) req[ct++] = 0x40;
+			if (cv.b[1] == 0x0D) {
+			   req[ct-1] = 0x40;
+			   req[ct++] = 0x0D;
+		    }	
 		req[ct++] = cv.b[0];
 		if (cv.b[0] == 0x40) req[ct++] = 0x40;
+			if (cv.b[0] == 0x0D) {
+			   req[ct-1] = 0x40;
+			   req[ct++] = 0x0D;
+		    }	
 	}
 	
   if (type == SET_SCHUECOID) {
   	req[ct++] = (unsigned char) value;
   }
 
-	req[ct++] = AE_Checksum(req,ct);
+  unsigned char cs = AE_Checksum(req,ct);
+  if (cs == 0x40) {
+  	 req[ct++] = 0x40;
+  	 req[ct++] = 0x40;
+    }
+  else {
+  	   if (cs == 0x0D) {
+		  	 req[ct++] = 0x40;
+		  	 req[ct++] = 0x0D;
+		    }
+  	   else {
+  	   	req[ct++] = cs;
+  	    }
+       }  
+	//req[ct++] = AE_Checksum(req,ct);
 	req[ct++] = 0x0D;
 
 
-  if (logit & 0x02) {
+  if (logit & 0x02 && type == 1022) {
 		  printf("\r\n. ");
 		  for (r=0; r < ct; r++) {
 		  	 printf("%02X ",req[r]); 
 		  }
    }
+   
   SendSerial(req,ct);	
   r = ReadSerial();	
-  
   
   if (r>0)  r = AE_Analyze (sbuf, r);
   	
@@ -3574,7 +3607,6 @@ int main (int argc, char *argv[])
   
    getParameters ();
    init_fdarrays();
-   printf("COMM 1\r\n");fflush(stdout);
    if (overtake) {
 	   char * answer = sendgetrequest ("?CMD=OVERTAKE","127.0.0.1", listenport,NULL);
 	   if (globalgetsize > 0)
@@ -3584,7 +3616,6 @@ int main (int argc, char *argv[])
 	  	  }
      } 
    else { 
-   	 printf("COMM 2\r\n");fflush(stdout); 
 	   char * answer = sendgetrequest ("?CMD=ISALIVE","127.0.0.1", listenport,NULL);
 	   if (globalgetsize > 0)
 	  	  if (strstr(answer,"AECLOGGEROK")) {
@@ -3614,7 +3645,7 @@ int main (int argc, char *argv[])
           program_path,param_path, dontfork, listenport, serialport, tmp_path, log_path, log_interval,req_interval,pow_interval);
   init(); 
    
-  if (getUSBID()) initSerialPort(); 
+  if (getUSBID(serialidentifier)) initSerialPort(); 
   
   
   buildLogList();
@@ -3661,7 +3692,7 @@ int main (int argc, char *argv[])
 		  	 if (usbticker <= current_time) {
 		  	 	 usbticker = current_time +300;
 		  	   if (current_time - tslastserial > 20)
-		  	       if (getUSBID()) 
+		  	       if (getUSBID(serialidentifier)) 
 		  	       	  initSerialPort(); 
 		  	   	
 		  	   }
