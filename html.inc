@@ -40,7 +40,7 @@
   var offline;
   var maxdevices;
   var devicedata=null;
-
+  var dcolor=Array();
   var month= ["","Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
   
   function daysInMonth(year,month) {
@@ -75,6 +75,7 @@
 			          aTag.setAttribute('target',"display");
 			          aTag.setAttribute('onClick',"setTimeout('lclose()',150);");
 			          aTag.innerHTML = devicedata.devices[a].name;
+			          dcolor[a]=devicedata.devices[a].displaycolor;
 			          div.appendChild(aTag);
             }
 	        }
@@ -665,7 +666,12 @@ function createCharts() {
 					    			]
 					  	}
   	      );
-
+  	      if (devicedata.hourcolor != -1)
+  	           chartDayHour.options.data[0].color=devicedata.hourcolor;
+  	         else
+               chartDayHour.options.data[0].color=devicedata.devices[deviceindex].displaycolor; 	
+           
+ 
   chartLivePower = new window.parent.CanvasJS.Chart(document.getElementById("chartLivePowerID"),
 					    {
 				    	animationEnabled: false,
@@ -720,6 +726,11 @@ function createCharts() {
 					    			]
 					  	}
   	          );
+  	          if (devicedata.livecolor != -1)
+  	           chartLivePower.options.data[0].color=devicedata.livecolor;
+  	         else
+               chartLivePower.options.data[0].color=devicedata.devices[deviceindex].displaycolor; 	          
+   	          
  chartDayLog = new window.parent.CanvasJS.Chart(document.getElementById("chartDayLogID"),
 					     {
 					     	zoomEnabled:true,
@@ -790,6 +801,9 @@ function createCharts() {
 					    			]
 					  	}
   	         );
+  	         
+  	           chartDayLog.options.data[0].color=devicedata.devices[deviceindex].displaycolor;
+  	         
 }
  
  function initCharts(){
@@ -1027,7 +1041,6 @@ function createCharts() {
 <script type="text/javascript">
 
   var numdevices=window.parent.maxdevices;
-
   var hosttxt=window.parent.hosttxt;
   
   var maxdevices = window.parent.maxdevices;
@@ -1052,15 +1065,39 @@ function createCharts() {
          	
          	chartStatusBar.options.data[0].dataPoints = []; // current
          	chartStatusBar.options.data[1].dataPoints = []; // reduce
+      		var sum = 0;
+         	var sred = 0;
+
          	for (a=0; a<jdata.data.length; a++) { 
          		 var txt; 
-         		 if (a  < maxdevices) 
+         		 var dcolor;
+         		 if (a  < maxdevices) {
          		    txt = "PV-"+a.toString();
-         		 else 
-         		 	  txt = "EV";   
-         	   chartStatusBar.options.data[0].dataPoints.push({y:Math.round(jdata.data[a].current),  value: jdata.data[a].current.toFixed(0)});
-             chartStatusBar.options.data[1].dataPoints.push({y:Math.round(jdata.data[a].reduce)-Math.round(jdata.data[a].current),  label:txt,value: jdata.data[a].current.toFixed(0)});
-            }         	
+         		    dcolor = devicedata.devices[a].displaycolor; 
+         		    }
+         		 else {
+         		 	  txt = "EV";    
+         		 	  dcolor = '#009900';
+         		 	  }
+         	
+         		 if (jdata.data[a].current != -999) {	 
+         		    if (jdata.data[a].current <0)
+         		       jdata.data[a].current = 0;
+         		    if (jdata.data[a].reduce <0)
+         		       jdata.data[a].reduce = 0;   
+                if (a < maxdevices) {
+                	sum += jdata.data[a].current;
+                	sred += devicedata.devices[a].maxpower;
+                }
+
+         	      chartStatusBar.options.data[0].dataPoints.push({y:Math.round(jdata.data[a].current),  value: jdata.data[a].current.toFixed(0), color: dcolor});
+                chartStatusBar.options.data[1].dataPoints.push({y:Math.round(jdata.data[a].reduce)-Math.round(jdata.data[a].current),  label:txt,value: jdata.data[a].current.toFixed(0)});
+             }
+          } 
+              
+          document.getElementById('total_sum').innerHTML = sum.toFixed(0);
+          //document.getElementById('total_per').innerHTML = (sum/sred).toFixed(2);
+              	
          	chartStatusBar.render();
          }
        }
@@ -1069,8 +1106,8 @@ function createCharts() {
    }
 
 		function redirect_to_detail (e) {
-			  id = e.dataSeriesIndex;
-			if (id<100) {
+			  id = e.dataPointIndex;
+			if (id<maxdevices) {
 				parent.document.getElementById('wr-details').style.color='red';
 				parent.document.getElementById('wr-overview').style.color='black';
 				location.replace("http://"+hosttxt+"/?CMD=STATUS_DEVICE&DEV="+id);
@@ -1095,14 +1132,7 @@ var chartDayLogSum;
 var chartDayHourSum;
 function createCharts() { 
 
-window.parent.CanvasJS.addColorSet("customColorSet1",
-     [//colorSet Array
-      "#DDDD00",
-      "#DDCC00",
-      "#DDBB00",
-      "#DDAA00",
-      "#DD9900"  
-    ]); 
+
 
 window.parent.CanvasJS.addColorSet("StackedSum",
      [ "#117711", 
@@ -1111,6 +1141,8 @@ window.parent.CanvasJS.addColorSet("StackedSum",
        "#DDAA00",
        "#DD7700"  
     ]); 
+
+window.parent.CanvasJS.addColorSet("StackedSum",window.top.dcolor); 
 
 
 	
@@ -1155,7 +1187,7 @@ window.parent.CanvasJS.addColorSet("StackedSum",
 				    	animationEnabled: false,
 				    	backgroundColor:"transparent",
 				    	margin: 0,
-
+              colorSet:"StackedSum",
 					    axisX:{
 					    	     margin:0,
 					        	 gridThickness: 1,
@@ -1193,6 +1225,7 @@ chartStatusBar = new window.parent.CanvasJS.Chart(document.getElementById("chart
 				    	animationEnabled: false,
 				    	backgroundColor:"transparent",
 				    	margin: 0,
+				    	colorSet:"StackedSum",
 					    axisX:{
 					    	     margin:0,
 					        	 gridThickness: 0,
@@ -1204,11 +1237,12 @@ chartStatusBar = new window.parent.CanvasJS.Chart(document.getElementById("chart
 					           tickThickness:1
 					    			},
 		    			axisY: {
-				    	       margin:5,
+		    				     margin:5,
 					           lineThickness:1,
 					           tickThickness:1
 					            },
 					    axisY2: {
+					    	     minimum:0,
 					        	 gridThickness: 1,
 				    	       labelFontColor: "#333333",
 				    	       labelFontSize: 12,
@@ -1245,7 +1279,6 @@ chartStatusBar = new window.parent.CanvasJS.Chart(document.getElementById("chart
              		      if (dat < 0) dat = 0;
                 	    chartDayLogSum.options.data[a].dataPoints.push({x:jdata.devices[a].data[b].ts*1000,y:dat});
         	            lasttsDayLogSum = jdata.devices[a].data[b].ts;
-        	    
         	  }
         	}
         	
@@ -1344,7 +1377,7 @@ chartStatusBar = new window.parent.CanvasJS.Chart(document.getElementById("chart
 													    	  lineThickness:0.5, 
 													    	  lineColor:"#00FF00",
 													    	  type: "stackedArea",
-													        fillOpacity: .7, 
+													        fillOpacity: .6, 
 													        xValueType: "dateTime",
 													        axisYType:"secondary",
 													        dataPoints: []
@@ -1367,7 +1400,7 @@ chartStatusBar = new window.parent.CanvasJS.Chart(document.getElementById("chart
 													    	  type: "stackedColumn",
 													    	  color:"#00AA00",
 													    	  
-													        fillOpacity: .5, 
+													        fillOpacity: .6, 
 													        xValueType: "number",
 													        axisYType:"secondary",
 													        dataPoints: []
@@ -1454,7 +1487,7 @@ chartStatusBar = new window.parent.CanvasJS.Chart(document.getElementById("chart
 	     <select onchange='set_reduction();' id='combo_reduce' size='1' name='rcombo' style='padding:2px;border-radius: 5px;border:2px solid #8888aa;font-size:16px;background-color:#FAFAFF;'>
 	     </select>	
 	</div>
-	<div id='maxpower'style='display:inline-block;'></div>
+	<div id='maxpower' style='display:inline-block;'></div>
 </div>
 
 <div id="info" style='position:absolute; top:500px; left:0px; height: 50px; width:100px;z-index:100; border:1px;margin-left:0px;'></div>
@@ -1463,9 +1496,17 @@ chartStatusBar = new window.parent.CanvasJS.Chart(document.getElementById("chart
   <table onclick='reload_daten("table_statistik","STATISTIK");' id='table_statistik' style='vertical-align:text-top;	width:100%%;margin-top:0px;cursor:pointer;	'></table>
 	</div>
 
+<div id='total_sum' style='position:absolute; font-size:30px;font-family:arial; font-weight:bold;top:200px; right:170px;height:170px;width:60px;border:0px solid #aaaaaa;z-index:60;'></div>
+<div  style='position:absolute; font-size:20px;font-family:arial; font-weight:bold;top:208px; right:165px;height:170px;width:10px;border:0px solid #aaaaaa;z-index:60;'>W</div>
+<div id='total_per' style='position:absolute; top:200px; right:80px;height:170px;width:60px;border:0px solid #aaaaaa;z-index:60;'></div>
+
+	
+
+
+
 |-------- Charts
 
-<div style='position:absolute; top:17px; left:330px;width:220px; text-align:center; font-size:13px;font-family:arial;' >Ertrag PV / Zulieferung EV</div>	
+<div id= 'header_status' style='position:absolute; top:17px; left:330px;width:220px; text-align:center; font-size:13px;font-family:arial;' >Ertrag PV / Zulieferung EV</div>	
 <div style='position:absolute; top:17px; left:20px; width:230px; text-align:center;font-size:13px;font-family:arial;' >Ertrag alle PV heute / Stunde</div>
 
 <div id="chartDayLogSumID" style='position:absolute; top:280px; left:0px; height: 275px; width:895px;z-index:111; border:0px solid red;margin:0px;'></div>
@@ -1557,7 +1598,8 @@ chartStatusBar = new window.parent.CanvasJS.Chart(document.getElementById("chart
      	     } 
        }
      	  
-   	
+   	var what = getGranularity() == 1 ? "MONTH" : "WEEK";
+       var dev = document.getElementById('combo_device').options[document.getElementById('combo_device').selectedIndex].value;
 	   var rq;
 	   rq = new XMLHttpRequest();
 	   rq.onreadystatechange=function()
@@ -1584,17 +1626,19 @@ chartStatusBar = new window.parent.CanvasJS.Chart(document.getElementById("chart
           for (a=0; a<numdevices; a++) 
              chartSelectBar.options.data[a].dataPoints = [];
          	for (a=0; a<jdata.devices.length; a++) {
-         		
+         		 
              for (b=0; b<jdata.devices[a].data.length; b++) { 
-             	   
-            	       chartSelectBar.options.data[a].dataPoints.push({x:(jdata.devices[a].data[b].ts)*1000,y:jdata.devices[a].data[b].yield});
+             var devid;
+             if (dev == -1) devid=a;
+                else devid=dev;	   
+            	       chartSelectBar.options.data[a].dataPoints.push({x:(jdata.devices[a].data[b].ts)*1000,
+            	       	            y:jdata.devices[a].data[b].yield, color:devicedata.devices[devid].displaycolor});
          	   }
           }
           chartSelectBar.render();
          }
        }
-       var what = getGranularity() == 1 ? "MONTH" : "WEEK";
-       var dev = document.getElementById('combo_device').options[document.getElementById('combo_device').selectedIndex].value;
+       
        xrequest ="http://"+hosttxt+"/?CMD=GETLOG"+ what + "&DEV="+dev+"&YEAR="+granyear+"&VAL="+granvalue;
        rq.open("GET", xrequest, true);
 	     rq.send(null);

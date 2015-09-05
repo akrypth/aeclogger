@@ -45,7 +45,7 @@
 #define F_PARAM 6
 #define F_STATISTIK 7
 
-const char Version[] = "0.18";
+const char Version[] = "0.19";
 const double sqr2 = 1.414213562373095;
 
 
@@ -87,7 +87,10 @@ time_t tslastserial;
 int serialid=1000;
 
 int datalog_active=0;
-int logit = 4;
+int logit = 0;
+
+long detailHourColor=0x000099;
+long detailLiveColor=0x002299;
 
 int globalgetsize;
 
@@ -200,7 +203,7 @@ fd_set active_fd_set, read_fd_set;
     	double AE_PV_DC_Spannung;
     	double AE_PV_DC_Leistung;
     	double AE_PV_AC_Leistung;
-
+    unsigned long AE_ChartColor;
     double AE_Temperatur;
 
 		// AEC device-parameters
@@ -624,15 +627,16 @@ void writeJSONDeviceinfo(int fd)
    }
 
 
-  gzprintf(tmp,"{\"AECLogger\":\"%s\",\"time\":\"%s\",\"sumpower\": %1.0f,\"setsumpower\": %1.0f,\"devices\":[",Version,
-                                                                                             tbuffer,sumpower,setsumpower);
+  gzprintf(tmp,"{\"AECLogger\":\"%s\",\"time\":\"%s\",\"sumpower\": %1.0f,\"setsumpower\": %1.0f, \"livecolor\": \"#%06X\" , \"hourcolor\": \"#%06X\" ,\"devices\":[",Version,
+                                                                                             tbuffer,sumpower,setsumpower,detailLiveColor,detailHourColor);
   firstdevice = 1;
   for (device=0; device < AENumDevices; device++) {
        if (!firstdevice) 
  	     	 gzprintf(tmp,"},");
-       gzprintf(tmp,"{\"id\": %d,\"name\": \"%s\",\"maxpower\": %1.0f, \"setpower\": %1.0f ",device,AEDevicesComment[device],
+       gzprintf(tmp,"{\"id\": %d,\"name\": \"%s\",\"maxpower\": %1.0f, \"setpower\": %1.0f, \"displaycolor\": \"#%06X\" ",device,AEDevicesComment[device],
                                                                                              AEData[device].AE_Max_Leistung,
-                                                                                             AEData[device].AE_Reduzierung);
+                                                                                             AEData[device].AE_Reduzierung,
+                                                                                             AEData[device].AE_ChartColor);
  	     firstdevice = 0;
       }
   gzprintf(tmp,"}]}");
@@ -871,7 +875,7 @@ void initDayLogs (void)
 
 void saveLiveLog (int idx, int tmp)
 {
-	//if (logit & 4) printf("saveLiveLog"); fflush(stdout);   
+	if (logit & 1) printf("saveLiveLog"); fflush(stdout);   
 	
 	char fname[100];
   
@@ -886,7 +890,7 @@ void saveLiveLog (int idx, int tmp)
 	  }
 	else 
 		printf("cannot open LOG-File %s\r\n",fname);
-	//if (logit & 4) printf("...DONE\r\n"); fflush(stdout);   
+	if (logit & 1) printf("...DONE\r\n"); fflush(stdout);   
 }
 
 //************************************************
@@ -922,7 +926,7 @@ void cleanTmp (void)
 
 void saveDayLog (int idx, int tmp)
 {
-	//if (logit & 4) printf("saveDayLog"); fflush(stdout);   
+	if (logit & 1) printf("saveDayLog"); fflush(stdout);   
 
 	struct tm * timeinfo;
 	char fname[100];
@@ -946,7 +950,7 @@ void saveDayLog (int idx, int tmp)
 	  }
 	else 
 		printf("cannot open LOG-File %s\r\n",fname);
-	//if (logit & 4) printf("...DONE\r\n"); fflush(stdout);   
+	if (logit & 1) printf("...DONE\r\n"); fflush(stdout);   
 }
 
 
@@ -1107,13 +1111,14 @@ void changeLogDay(void)
     }
 }
 
-//************************************************
+//*****************************************
 
 void write_st (int fd, char *msg, ...)
 {
  int r = 0;
+ int z;
  unsigned long m = millis();
- if (fd == 0) return; 
+ if (fd <= 0) return; 
  va_list ap;
  char * buf;
  va_start(ap, msg);
@@ -1124,11 +1129,12 @@ void write_st (int fd, char *msg, ...)
  vsprintf(buf, msg, ap);
  va_end(ap); 
  do {
-    r += write(fd, buf+r, strlen(buf)-r );
-  } while (r < strlen(buf) || millis()- m > 1500); 
+    z = write(fd, buf+r, strlen(buf)-r );
+    if (z>0) r+=z;
+  } while (r < strlen(buf) || millis()- m > 3500); 
  free(buf);  
 }
-
+	
 //************************************************
 
 void send_http_header (int fd, int code)
@@ -1496,6 +1502,16 @@ void getParameters(void)
 				if (start = strstr(params,"http_port="))
 					listenport = atoi (start+10);
 					
+				if (start = strstr(params,"log_level="))
+					logit = atoi (start+10);		
+					
+					
+				if (start = strstr(params,"detail_livecolor="))
+					detailLiveColor=strtol(start+17,NULL,16);	
+
+				if (start = strstr(params,"detail_hourcolor="))
+					detailHourColor=strtol(start+17,NULL,16);						
+					
 				if (start = strstr(params,"log_interval="))
 					log_interval = atoi (start+13);	
 				if (start = strstr(params,"req_interval="))
@@ -1582,10 +1598,15 @@ void getParameters(void)
 				for (a=0; a<ct; a++){
 					snprintf(key,29,"inverterreduce_%d=",a);
 					if (start=strstr(params,key)) {
-						//printf("---%s----\r\n",start+strlen(key));fflush(stdout);
 						AEData[a].AE_Reduzierung_set=(double)atoi(start+strlen(key));
 					}
 				}
+	
+				for (a=0; a<ct; a++){
+					snprintf(key,29,"invertercolor_%d=",a);
+					if (start=strstr(params,key)) 
+						AEData[a].AE_ChartColor=strtol(start+strlen(key),NULL,16);
+				}	
 				
 					for (a=0; a<ct; a++){
 					snprintf(key,29,"schuecoid_%d=",a);
@@ -2464,11 +2485,12 @@ void processevent(int fd)
           send_http_header(fd,200);
           char * txt;
           txt = getText(10);
+         
           write_st(fd,txt,host,Version,host,host,host);
           free(txt); 
    	     	return;
    	    }  
-        //if (logit & 4) printf("req-->%s\r\n",url);			
+        if (logit & 4) printf("Request-->%s ",url);			
 		    if ((pos = strstr(url,"CMD=")) != NULL) 
   	       getValue(pos+4, _cmd, '&',20);
   	    if ((pos = strstr(url,"VAL=")) != NULL) 
@@ -2697,6 +2719,7 @@ void processevent(int fd)
            }	
 		
       }		
+ if (logit & 4) printf("..Done\r\n");			
 	 
   free(buffer);
 }
@@ -3650,8 +3673,18 @@ int main (int argc, char *argv[])
   
   buildLogList();
   
-  for (c=0; c<AENumDevices; c++)    
-    printf("\t Inverterid %d : %d (%s) Reduzierung default:%1.0f\r\n",c,AEDevices[c], AEDevicesComment[c],AEData[c].AE_Reduzierung_set);
+  for (c=0; c<AENumDevices; c++) {   
+  	if (AEData[c].AE_ChartColor == 0) 
+  		switch(c) {
+  			case 0: AEData[c].AE_ChartColor=0x117711;break;
+				case 1: AEData[c].AE_ChartColor=0x22AA22;break;
+				case 2: AEData[c].AE_ChartColor=0x33FF33;break;
+				case 3: AEData[c].AE_ChartColor=0xDDAA00;break;
+				case 4: AEData[c].AE_ChartColor=0xDD7700;break;
+     
+  		}
+    printf("\t Inverterid %d : %d (%s) Reduzierung default:%1.0f Color:%06X\r\n",c,AEDevices[c], AEDevicesComment[c],AEData[c].AE_Reduzierung_set,AEData[c].AE_ChartColor);
+  }
   printf("...\r\n");  	    
   
   timeout.tv_sec  = 0; 
