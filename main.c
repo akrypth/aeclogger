@@ -17,6 +17,8 @@
 #include <sys/types.h>
 #include <errno.h>
 #include <sys/klog.h>
+#include <sys/stat.h>
+#include <sys/time.h>
 
 
 #define FMT_RAW 0
@@ -45,8 +47,17 @@
 #define F_PARAM 6
 #define F_STATISTIK 7
 
-const char Version[] = "0.19";
+const char Version[] = "0.20";
 const double sqr2 = 1.414213562373095;
+
+
+// function prototypes
+//>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+int submit_file (int, char *, int, char* ); 
+int ReadSerial (void);
+int SendSerial (char *, int);
+
 
 
 // struct / variables for html.inc
@@ -1396,7 +1407,7 @@ int initEventListenSocket (void)
   setsockopt(eventfd, SOL_SOCKET, SO_RCVTIMEO,(struct timeval *)&tv,sizeof(struct timeval));
   setsockopt(eventfd, SOL_SOCKET, SO_SNDTIMEO,(struct timeval *)&tv,sizeof(struct timeval));
 
-  if (eventfd < 0)  error("ERRsock");
+  if (eventfd < 0)  printf("ERRsock");
   bzero((char *) &eventserv_addr, sizeof(eventserv_addr));
   eventserv_addr.sin_family = AF_INET;
   eventserv_addr.sin_addr.s_addr = INADDR_ANY;
@@ -2085,6 +2096,21 @@ void write_json_Current_Overview(int fd)
 
 //************************************************ 
 
+void write_json_Current_Sum(int fd)
+{
+	int a;
+	double sum = 0;
+	send_http_header (fd,200);
+	for (a=0; a<AENumDevices; a++) {
+		if (! AEData[a].AE_Offline) 
+			  sum += AEData[a].AE_current_power;
+	}
+  write_st(fd,"{\"currentsum\":%f}", sum);
+}
+
+
+//************************************************ 
+
 void write_detailpage (int fd, int id)
 {
 	send_http_header (fd,200);
@@ -2717,6 +2743,9 @@ void processevent(int fd)
 			 	     else    
 			   	       write_currentpage (fd, atoi(_dev));
            }	
+       if ((pos = strstr(_cmd,"CSUM")) != NULL  ) {
+			 	         write_json_Current_Sum(fd);
+           }	    
 		
       }		
  if (logit & 4) printf("..Done\r\n");			
@@ -3683,7 +3712,7 @@ int main (int argc, char *argv[])
 				case 4: AEData[c].AE_ChartColor=0xDD7700;break;
      
   		}
-    printf("\t Inverterid %d : %d (%s) Reduzierung default:%1.0f Color:%06X\r\n",c,AEDevices[c], AEDevicesComment[c],AEData[c].AE_Reduzierung_set,AEData[c].AE_ChartColor);
+    printf("\t Inverterid %d : %d (%s) Reduzierung default:%1.0f Color:%06luX\r\n",c,AEDevices[c], AEDevicesComment[c],AEData[c].AE_Reduzierung_set,AEData[c].AE_ChartColor);
   }
   printf("...\r\n");  	    
   

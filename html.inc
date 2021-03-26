@@ -1095,7 +1095,7 @@ function createCharts() {
              }
           } 
               
-          document.getElementById('total_sum').innerHTML = sum.toFixed(0);
+          document.getElementById('total_sum').innerHTML = sum.toFixed(0)+" W";
           //document.getElementById('total_per').innerHTML = (sum/sred).toFixed(2);
               	
          	chartStatusBar.render();
@@ -1496,8 +1496,8 @@ chartStatusBar = new window.parent.CanvasJS.Chart(document.getElementById("chart
   <table onclick='reload_daten("table_statistik","STATISTIK");' id='table_statistik' style='vertical-align:text-top;	width:100%%;margin-top:0px;cursor:pointer;	'></table>
 	</div>
 
-<div id='total_sum' style='position:absolute; font-size:30px;font-family:arial; font-weight:bold;top:200px; right:170px;height:170px;width:60px;border:0px solid #aaaaaa;z-index:60;'></div>
-<div  style='position:absolute; font-size:20px;font-family:arial; font-weight:bold;top:208px; right:165px;height:170px;width:10px;border:0px solid #aaaaaa;z-index:60;'>W</div>
+<div id='total_sum' style='position:absolute; font-size:30px;font-family:arial; text-align:left; font-weight:bold;top:200px; right:80px;height:170px;width:12	0px;border:0px solid #aaaaaa;z-index:60;'></div>
+//<div  style='position:absolute; font-size:20px;font-family:arial; font-weight:bold;top:208px; right:165px;height:170px;width:10px;border:0px solid #aaaaaa;z-index:60;'>W</div>
 <div id='total_per' style='position:absolute; top:200px; right:80px;height:170px;width:60px;border:0px solid #aaaaaa;z-index:60;'></div>
 
 	
